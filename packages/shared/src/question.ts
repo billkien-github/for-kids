@@ -213,20 +213,24 @@ export const QuestionInput = z
     message: 'Câu info không tính điểm',
   })
 
-export const WorksheetInput = z
-  .object({
-    subjectCode: z.string().min(1),
-    grade: z.number().int().min(GRADE_MIN).max(GRADE_MAX),
-    topic: z.string().min(1).optional(),
-    title: z.string().min(1).max(200),
-    description: z.string().max(2000).optional(),
-    lang: lang.optional(),
-    layout: z.enum(['one_per_screen', 'grid']).default('one_per_screen'),
-    timeLimitSec: z.number().int().positive().max(4 * 60 * 60).optional(),
-    sourceNote: z.string().max(2000).optional(),
-    questions: z.array(QuestionInput).min(1).max(200),
-  })
-  .superRefine((w, ctx) => {
+const WorksheetFields = z.object({
+  subjectCode: z.string().min(1),
+  grade: z.number().int().min(GRADE_MIN).max(GRADE_MAX),
+  topic: z.string().min(1).nullish(),
+  title: z.string().min(1).max(200),
+  description: z.string().max(2000).nullish(),
+  lang: lang.nullish(),
+  layout: z.enum(['one_per_screen', 'grid']).default('one_per_screen'),
+  timeLimitSec: z.number().int().positive().max(4 * 60 * 60).nullish(),
+  sourceNote: z.string().max(2000).nullish(),
+  questions: z.array(QuestionInput).min(1).max(200),
+})
+
+/** Sửa bài: chỉ gửi những trường cần đổi; `questions` có mặt thì thay toàn bộ danh sách câu. */
+export const WorksheetPatch = WorksheetFields.partial().extend({ layout: z.enum(['one_per_screen', 'grid']).optional() })
+export type WorksheetPatch = z.infer<typeof WorksheetPatch>
+
+export const WorksheetInput = WorksheetFields.superRefine((w, ctx) => {
     if (w.layout !== 'grid') return
     for (const [i, q] of w.questions.entries()) {
       if (!GRID_QUESTION_TYPES.includes(q.body.type)) {

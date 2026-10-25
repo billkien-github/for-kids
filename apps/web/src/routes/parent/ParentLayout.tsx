@@ -4,7 +4,13 @@ import { meQueryKey, post, useMe } from '../../api'
 import { PinPad } from '../../components/PinPad'
 import { usePinSubmit } from '../../usePinSubmit'
 
-const NAV = [{ to: '/parent/children', label: 'Hồ sơ các bé' }] as const
+const NAV = [
+  { to: '/parent/worksheets', label: 'Bài tập' },
+  { to: '/parent/assignments', label: 'Giao bài' },
+  { to: '/parent/results', label: 'Kết quả' },
+  { to: '/parent/children', label: 'Hồ sơ các bé' },
+  { to: '/parent/settings', label: 'Cài đặt' },
+] as const
 
 /** Khu phụ huynh (§6): hết hạn mở khoá thì hiện bàn phím PIN ngay tại chỗ. */
 export function ParentLayout() {
@@ -37,7 +43,11 @@ export function ParentLayout() {
   return (
     <div className="min-h-dvh bg-slate-50">
       <header className="flex flex-wrap items-center gap-2 bg-slate-800 px-4 py-3 text-white">
-        <span className="mr-4 font-bold">Khu phụ huynh · {me.data.family.name}</span>
+        {/* Rời khu phụ huynh thì khoá luôn, để bé không quay vào được khi chưa hết 15 phút. */}
+        <button type="button" onClick={lock} className="min-h-touch rounded-lg bg-white/15 px-4 font-semibold">
+          ← Về màn chọn bé
+        </button>
+        <span className="mx-2 font-bold">Khu phụ huynh · {me.data.family.name}</span>
         {NAV.map((n) => (
           <NavLink
             key={n.to}
@@ -47,10 +57,7 @@ export function ParentLayout() {
             {n.label}
           </NavLink>
         ))}
-        <button type="button" onClick={lock} className="ml-auto min-h-touch rounded-lg bg-white/10 px-4">
-          🔒 Khoá
-        </button>
-        <button type="button" onClick={logout} className="min-h-touch rounded-lg px-4 text-white/70" title={me.data.parent.email}>
+        <button type="button" onClick={logout} className="ml-auto min-h-touch rounded-lg px-4 text-white/70" title={me.data.parent.email}>
           Đăng xuất
         </button>
       </header>

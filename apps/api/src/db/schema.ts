@@ -232,7 +232,8 @@ export const attemptAnswer = pgTable(
   {
     id: pk(),
     attemptId: uuid('attempt_id').notNull().references(() => attempt.id, { onDelete: 'cascade' }),
-    questionId: uuid('question_id').notNull().references(() => question.id),
+    // null khi câu hỏi bị xoá lúc sửa bài; lịch sử vẫn đúng nhờ question_snapshot.
+    questionId: uuid('question_id').references(() => question.id, { onDelete: 'set null' }),
     questionSnapshot: jsonb('question_snapshot').notNull(),
     response: jsonb('response'),
     score: real('score'),

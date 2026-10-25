@@ -1,4 +1,7 @@
 export * from './api.js'
 export * from './constants.js'
+export * from './dto.js'
+export * from './grading.js'
 export * from './question.js'
+export * from './sanitize.js'
 export * from './split-strategy.js'

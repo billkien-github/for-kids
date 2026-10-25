@@ -8,8 +8,12 @@ import Fastify from 'fastify'
 import { loadSession } from './auth/session.js'
 import type { Deps } from './deps.js'
 import { HttpError, sendHttpError } from './http.js'
+import { assetRoutes } from './routes/assets.js'
 import { authRoutes } from './routes/auth.js'
+import { kidRoutes } from './routes/kid.js'
+import { mcpRoutes } from './routes/mcp.js'
 import { parentChildrenRoutes } from './routes/parent-children.js'
+import { parentContentRoutes } from './routes/parent-content.js'
 
 export async function buildApp(deps: Deps) {
   const { config, db } = deps
@@ -26,7 +30,7 @@ export async function buildApp(deps: Deps) {
       },
     },
   })
-  await app.register(cookie, { secret: config.SESSION_SECRET })
+  await app.register(cookie)
 
   app.decorateRequest('auth', null)
   app.addHook('onRequest', loadSession(deps))
@@ -44,6 +48,10 @@ export async function buildApp(deps: Deps) {
   })
   authRoutes(app, deps)
   parentChildrenRoutes(app, deps)
+  parentContentRoutes(app, deps)
+  assetRoutes(app, deps)
+  kidRoutes(app, deps)
+  mcpRoutes(app, deps)
 
   const webDist = config.WEB_DIST_DIR && path.resolve(config.WEB_DIST_DIR)
   const serveWeb = Boolean(webDist && fs.existsSync(webDist))

@@ -12,6 +12,10 @@
     "test": "pnpm -r test",
     "db:generate": "pnpm --filter @for-kids/api db:generate",
     "db:migrate": "pnpm --filter @for-kids/api db:migrate",
-    "db:seed": "pnpm --filter @for-kids/api db:seed"
+    "db:seed": "pnpm --filter @for-kids/api db:seed",
+    "start": "pnpm --filter @for-kids/api start"
+  },
+  "devDependencies": {
+    "qrcode": "^1.5.4"
   }
 }

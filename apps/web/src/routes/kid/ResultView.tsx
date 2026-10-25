@@ -1,0 +1,84 @@
+import type { AttemptView } from '@for-kids/shared'
+import { useQueryClient } from '@tanstack/react-query'
+import { useState } from 'react'
+import { Link, useNavigate } from 'react-router'
+import { errorMessage, post } from '../../api'
+import { QuestionView } from '../../components/questions/QuestionView'
+
+export function Stars({ count, size = 'text-5xl' }: { count: number; size?: string }) {
+  return (
+    <span className={size} aria-label={`${count} sao`}>
+      {[1, 2, 3].map((i) => (
+        <span key={i} className={i <= count ? '' : 'opacity-20 grayscale'}>
+          ⭐
+        </span>
+      ))}
+    </span>
+  )
+}
+
+const cheer = (pct: number) => (pct >= 90 ? 'Xuất sắc! 🎉' : pct >= 75 ? 'Giỏi lắm! 👏' : pct >= 50 ? 'Khá rồi, cố thêm nhé! 💪' : 'Mình làm lại nhé! 🌱')
+
+/**
+ * Kết quả (§6 bé, mục 4): % đúng, sao, từng câu kèm đáp án đúng và lời giải.
+ * `readOnly`: phụ huynh xem lại, không có nút làm lại.
+ */
+export function ResultView({ view, timeUp, readOnly }: { view: AttemptView; timeUp?: boolean; readOnly?: boolean }) {
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const [error, setError] = useState<string | null>(null)
+  const result = view.result!
+  const responses = new Map(view.items.map((i) => [i.id, i.response]))
+  const langOf = new Map(view.items.map((i) => [i.id, i.ttsLang]))
+
+  const retry = async () => {
+    try {
+      const next = await post<AttemptView>('/kid/attempts', { worksheetId: view.worksheet!.id })
+      await queryClient.invalidateQueries({ queryKey: ['kid', 'home'] })
+      navigate(`/kid/attempt/${next.id}`)
+    } catch (err) {
+      setError(errorMessage(err))
+    }
+  }
+
+  return (
+    <main className={`min-h-dvh text-kid ${readOnly ? '' : 'bg-sky-50'}`}>
+      <section className="flex flex-col items-center gap-3 bg-white px-4 py-8 text-center shadow-sm">
+        {timeUp && <p className="rounded-full bg-amber-100 px-4 py-1 text-amber-800">⏰ Hết giờ, bài đã được nộp</p>}
+        <p className="text-slate-500">{view.worksheet?.title}</p>
+        <Stars count={result.stars} />
+        <p className="text-5xl font-bold">{Math.round(result.scorePct)}%</p>
+        {!readOnly && <p className="text-2xl">{cheer(result.scorePct)}</p>}
+        {result.starsGained > 0 && !readOnly && <p className="text-amber-700">Con được thêm {result.starsGained} ⭐</p>}
+        {!readOnly && (
+          <div className="mt-2 flex gap-3">
+            <button type="button" onClick={retry} className="min-h-touch rounded-2xl bg-sky-600 px-6 font-bold text-white">
+              🔁 Làm lại
+            </button>
+            <Link to="/kid" className="flex min-h-touch items-center rounded-2xl bg-slate-200 px-6 font-semibold">
+              🏠 Về trang chủ
+            </Link>
+          </div>
+        )}
+        {error && <p className="text-red-600">{error}</p>}
+      </section>
+
+      <ol className="mx-auto flex max-w-3xl flex-col gap-4 p-4">
+        {result.items
+          .filter((it) => it.body.type !== 'info')
+          .map((it, i) => (
+            <li key={it.id} className={`rounded-3xl border-l-8 bg-white p-5 shadow-sm ${it.isCorrect ? 'border-emerald-500' : 'border-red-400'}`}>
+              <p className="mb-3 flex items-center justify-between text-base font-semibold">
+                <span className="text-slate-400">Câu {i + 1}</span>
+                <span className={it.isCorrect ? 'text-emerald-600' : 'text-red-600'}>
+                  {it.isCorrect ? '✓ Đúng' : it.score && it.score > 0 ? `Đúng ${Math.round(it.score * 100)}%` : '✗ Chưa đúng'}
+                </span>
+              </p>
+              <QuestionView body={it.body} solution={it.body} response={responses.get(it.id)} lang={langOf.get(it.id) ?? 'vi-VN'} />
+              {it.explanation && <p className="mt-4 rounded-2xl bg-amber-50 p-4 text-lg">💡 {it.explanation}</p>}
+            </li>
+          ))}
+      </ol>
+    </main>
+  )
+}

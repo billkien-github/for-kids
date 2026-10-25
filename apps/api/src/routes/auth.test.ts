@@ -46,6 +46,20 @@ describe('đăng nhập', () => {
     expect((cookie.expires as Date).getTime() - t.clock.now().getTime()).toBe(90 * 24 * 3600 * 1000)
   })
 
+  it('cookie secure khi vào qua https (ngrok), không secure khi vào bằng http trong LAN', async () => {
+    const loginVia = (proto?: string) =>
+      t.app.inject({
+        method: 'POST',
+        url: '/api/auth/login',
+        payload: { email: TEST_PARENT.email, password: TEST_PARENT.password },
+        headers: proto ? { 'x-forwarded-proto': proto } : {},
+      })
+    const viaNgrok = (await loginVia('https')).cookies.find((c) => c.name === 'sid')!
+    const viaLan = (await loginVia()).cookies.find((c) => c.name === 'sid')!
+    expect(viaNgrok.secure).toBe(true)
+    expect(viaLan.secure).toBeFalsy()
+  })
+
   it('chặn sau 5 lần sai trong 5 phút, kể cả khi lần sau nhập đúng', async () => {
     for (let i = 0; i < 5; i++) expect((await login('sai')).statusCode).toBe(401)
     const blocked = await login()

@@ -8,6 +8,7 @@ import { MIGRATIONS_DIR } from './db/client.js'
 import * as schema from './db/schema.js'
 import { seed } from './db/seed.js'
 import { createDeps } from './deps.js'
+import { MemoryStorage } from './services/storage.js'
 
 export const TEST_PARENT = { email: 'parent@example.com', password: 'mat-khau-dai', pin: '1234' }
 
@@ -44,13 +45,15 @@ export async function createTestApp(env: Record<string, string> = {}) {
     now: () => now,
     advance: (ms: number) => (now = new Date(now.getTime() + ms)),
   }
-  const config = loadConfig({ NODE_ENV: 'test', DATABASE_URL: 'pglite', SESSION_SECRET: 'x'.repeat(32), ...env })
-  const app = await buildApp(createDeps(config, db, clock.now))
+  const config = loadConfig({ NODE_ENV: 'test', DATABASE_URL: 'pglite', ...env })
+  const storage = new MemoryStorage()
+  const app = await buildApp(createDeps(config, db, { clock: clock.now, storage }))
 
   return {
     app,
     db,
     clock,
+    storage,
     close: async () => {
       await app.close()
       await close()

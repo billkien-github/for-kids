@@ -13,7 +13,7 @@ packages/shared/ Schema Zod dùng chung (câu hỏi, bài tập), hằng số
 ## Chạy bằng Docker
 
 ```sh
-cp .env.example .env        # điền mật khẩu, SESSION_SECRET, tài khoản phụ huynh
+cp .env.example .env        # điền mật khẩu DB và tài khoản phụ huynh
 docker compose up -d --build
 docker compose exec app node dist/cli/seed.js   # tạo gia đình, phụ huynh, chủ đề Toán
 # Public qua ngrok (cần NGROK_AUTHTOKEN, NGROK_DOMAIN):

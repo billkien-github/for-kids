@@ -239,11 +239,16 @@ Thiết kế cho iPad, dùng được cả màn dọc và ngang. Vùng chạm �
 
 ## 8. MCP (`POST /mcp`, Streamable HTTP, header `Authorization: Bearer <token>`)
 
+- Chế độ stateless, trả JSON (không SSE); `GET`/`DELETE` trả 405.
+- `/agent` là bản sao của `/mcp`. Một số phần mềm diệt virus (đã gặp với Avast trên máy chủ ở nhà) chặn và làm hỏng response của mọi URL có đoạn "mcp", kể cả `127.0.0.1`. Agent chạy trên máy như vậy thì dùng `/agent`.
+- Token tạo ở trang Cài đặt, dạng `fk_…`, có các scope `content:write`, `publish`, `assign`, `results:read`.
+
 ### Tools
 | Tool | Scope | Mô tả |
 |---|---|---|
 | `list_children` | `results:read` | id, tên, lớp của các bé |
 | `list_catalog` | `content:write` | Môn, chủ đề, kỹ năng hiện có (để agent gắn tag đúng) |
+| `get_question_schema` | `content:write` | JSON Schema của bài tập kèm 1 ví dụ cho mỗi loại câu (giống resource bên dưới, vì nhiều client không tự đọc resource) |
 | `upsert_topic`, `upsert_skill` | `content:write` | Tạo mới nếu chưa có |
 | `upload_asset` | `content:write` | `{filename, mime, base64}` (≤ 10MB) → `assetId`. Chỉ nhận ảnh. |
 | `create_worksheet` | `content:write` | `{subjectCode, grade, topic?, title, description?, lang?, layout?, timeLimitSec?, sourceNote?, questions[]}` → tạo bản **nháp**. Nếu sai schema thì trả lỗi chỉ rõ đường dẫn tới trường sai, kiểu `questions[3].blanks[0].accept`. |
