@@ -19,7 +19,8 @@ import {
   upsertSkill,
   upsertTopic,
 } from '../services/worksheets.js'
-import { IMPORT_WORKSHEET_PROMPT, QUESTION_EXAMPLES } from './examples.js'
+import { childMistakes, childReport } from '../services/report.js'
+import { generatePracticePrompt, IMPORT_WORKSHEET_PROMPT, QUESTION_EXAMPLES } from './examples.js'
 
 // Tham số của create/update_worksheet. Kiểu câu hỏi để lỏng ở đây; WorksheetInput kiểm tra chi tiết
 // để báo lỗi kèm đường dẫn chính xác.
@@ -199,6 +200,28 @@ export function buildMcpServer(deps: Deps, auth: TokenAuth) {
     'Giao bài đã xuất bản cho các bé, có thể kèm hạn nộp (ISO 8601 có múi giờ, vd. 2026-11-01T20:00:00+07:00).',
     { worksheetId: z.uuid(), childIds: z.array(z.uuid()).min(1), dueAt: z.string().optional() },
     async (a) => ({ ids: await assignWorksheet(db, familyId, AssignInput.parse(a), 'token') }),
+  )
+
+  tool(
+    'get_child_report',
+    'results:read',
+    'Báo cáo của một bé: điểm trung bình lần chính thức theo môn/tuần, mức thành thạo từng kỹ năng (kỹ năng yếu), streak, bài quá hạn, số câu đến hạn ôn.',
+    { childId: z.uuid(), from: z.string().optional().describe('ISO 8601, mặc định 8 tuần trước'), to: z.string().optional() },
+    (a) => childReport(deps, familyId, a.childId, { from: a.from ? new Date(a.from) : undefined, to: a.to ? new Date(a.to) : undefined }),
+  )
+
+  tool(
+    'get_child_mistakes',
+    'results:read',
+    'Các câu bé làm sai gần đây (đề đầy đủ kèm đáp án, câu trả lời của bé, kỹ năng), để soạn bài luyện đúng chỗ yếu.',
+    { childId: z.uuid(), limit: z.number().int().min(1).max(100).optional() },
+    (a) => childMistakes(deps, familyId, a.childId, a.limit),
+  )
+
+  server.registerPrompt(
+    'generate_practice',
+    { description: 'Soạn bài luyện tập theo chỗ yếu của một bé rồi giao cho bé', argsSchema: { childName: z.string().optional() } },
+    (a) => ({ messages: [{ role: 'user', content: { type: 'text', text: generatePracticePrompt(a.childName) } }] }),
   )
 
   server.registerResource(

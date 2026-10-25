@@ -6,6 +6,9 @@ export const LEITNER_INTERVAL_DAYS: Record<1 | 2 | 3 | 4 | 5, number> = { 1: 1, 
 export const REVIEW_SESSION_SIZE = 10
 export const REVIEW_SESSION_STARS = 1
 
+/** §5.3: chỉ phân mức khi đã trả lời đủ số câu; dưới 0.5 cần luyện, từ 0.8 là thành thạo. */
+export const MASTERY_NEEDS_PRACTICE_BELOW = 0.5
+export const MASTERY_MASTERED_FROM = 0.8
 export const MASTERY_INITIAL = 0.5
 export const MASTERY_ALPHA = 0.3
 export const MASTERY_MIN_ANSWERS = 5

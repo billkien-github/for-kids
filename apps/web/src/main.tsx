@@ -5,18 +5,14 @@ import { createBrowserRouter, Navigate, RouterProvider } from 'react-router'
 import { ApiError, meQueryKey } from './api'
 import { RequireAuth } from './components/RequireAuth'
 import './index.css'
+import { AchievementsPage } from './routes/kid/AchievementsPage'
 import { AttemptPage } from './routes/kid/AttemptPage'
 import { KidHomePage } from './routes/KidHomePage'
 import { LoginPage } from './routes/LoginPage'
-import { AssignmentsPage } from './routes/parent/AssignmentsPage'
-import { ChildrenPage } from './routes/parent/ChildrenPage'
-import { NewWorksheetPage } from './routes/parent/NewWorksheetPage'
-import { ParentLayout } from './routes/parent/ParentLayout'
-import { ParentAttemptPage, ResultsPage } from './routes/parent/ResultsPage'
-import { SettingsPage } from './routes/parent/SettingsPage'
-import { WorksheetDetailPage } from './routes/parent/WorksheetDetailPage'
-import { WorksheetsPage } from './routes/parent/WorksheetsPage'
 import { ProfilesPage } from './routes/ProfilesPage'
+
+type ParentPages = typeof import('./routes/parent/pages')
+const parentPage = (name: keyof ParentPages) => async () => ({ Component: (await import('./routes/parent/pages'))[name] })
 
 // Phiên hết hạn hoặc khu phụ huynh bị khoá giữa chừng → tải lại /auth/me để các guard xử lý.
 const onApiError = (err: unknown) => {
@@ -43,19 +39,22 @@ const router = createBrowserRouter([
       { path: '/', element: <ProfilesPage /> },
       { path: '/kid', element: <KidHomePage /> },
       { path: '/kid/attempt/:id', element: <AttemptPage /> },
+      { path: '/kid/achievements', element: <AchievementsPage /> },
       {
         path: '/parent',
-        element: <ParentLayout />,
+        lazy: parentPage('ParentLayout'),
         children: [
-          { index: true, element: <Navigate to="/parent/worksheets" replace /> },
-          { path: 'worksheets', element: <WorksheetsPage /> },
-          { path: 'worksheets/new', element: <NewWorksheetPage /> },
-          { path: 'worksheets/:id', element: <WorksheetDetailPage /> },
-          { path: 'assignments', element: <AssignmentsPage /> },
-          { path: 'results', element: <ResultsPage /> },
-          { path: 'attempts/:id', element: <ParentAttemptPage /> },
-          { path: 'children', element: <ChildrenPage /> },
-          { path: 'settings', element: <SettingsPage /> },
+          { index: true, element: <Navigate to="/parent/overview" replace /> },
+          { path: 'overview', lazy: parentPage('OverviewPage') },
+          { path: 'rewards', lazy: parentPage('RewardsPage') },
+          { path: 'worksheets', lazy: parentPage('WorksheetsPage') },
+          { path: 'worksheets/new', lazy: parentPage('NewWorksheetPage') },
+          { path: 'worksheets/:id', lazy: parentPage('WorksheetDetailPage') },
+          { path: 'assignments', lazy: parentPage('AssignmentsPage') },
+          { path: 'results', lazy: parentPage('ResultsPage') },
+          { path: 'attempts/:id', lazy: parentPage('ParentAttemptPage') },
+          { path: 'children', lazy: parentPage('ChildrenPage') },
+          { path: 'settings', lazy: parentPage('SettingsPage') },
         ],
       },
     ],

@@ -185,15 +185,17 @@ describe('làm bài', () => {
     expect(resumed.items[2]!.response).toEqual({ choice: 'a' })
 
     const first = await ok<AttemptView>({ method: 'POST', url: `/api/kid/attempts/${view.id}/submit` })
-    expect(first.result).toMatchObject({ scorePct: 68.8, stars: 1, starsGained: 1 })
+    // 1 sao của bài + 1 sao thưởng huy hiệu "Bài đầu tiên".
+    expect(first.result).toMatchObject({ scorePct: 68.8, stars: 1, starsGained: 2 })
+    expect(first.result!.newBadges.map((b) => b.code)).toEqual(['first_worksheet'])
     expect(first.result!.items[1]).toMatchObject({ isCorrect: false, explanation: '97 lớn hơn 86' })
     // Nộp lại lần nữa không chấm/cộng sao lần hai.
-    expect((await ok<AttemptView>({ method: 'POST', url: `/api/kid/attempts/${view.id}/submit` })).result!.starsGained).toBe(1)
+    expect((await ok<AttemptView>({ method: 'POST', url: `/api/kid/attempts/${view.id}/submit` })).result!.starsGained).toBe(2)
     expect((await call({ method: 'PUT', url: `/api/kid/attempts/${view.id}/answers`, payload: { answers } })).statusCode).toBe(409)
 
     home = await ok<KidHome>({ method: 'GET', url: '/api/kid/home' })
     expect(home.today).toHaveLength(0)
-    expect(home.stars).toBe(1)
+    expect(home.stars).toBe(2)
     expect(home.library[0]).toMatchObject({ bestStars: 1, attempts: 1 })
 
     // Làm lại đúng hết: 3 sao, chỉ cộng thêm 2.
@@ -201,13 +203,15 @@ describe('làm bài', () => {
     expect(retry.attemptNo).toBe(2)
     await ok({ method: 'PUT', url: `/api/kid/attempts/${retry.id}/answers`, payload: { answers: answersFor(retry, true) } })
     const second = await ok<AttemptView>({ method: 'POST', url: `/api/kid/attempts/${retry.id}/submit` })
-    expect(second.result).toMatchObject({ scorePct: 100, stars: 3, starsGained: 2 })
-    expect((await ok<KidHome>({ method: 'GET', url: '/api/kid/home' })).stars).toBe(3)
+    // Thêm 2 sao (lên 3) + 1 sao thưởng huy hiệu "Điểm tuyệt đối".
+    expect(second.result).toMatchObject({ scorePct: 100, stars: 3, starsGained: 3 })
+    expect(second.result!.newBadges.map((b) => b.code)).toEqual(['perfect_1'])
+    expect((await ok<KidHome>({ method: 'GET', url: '/api/kid/home' })).stars).toBe(5)
 
     // Lần ba lại sai: không cộng, không trừ.
     const third = await ok<AttemptView>({ method: 'POST', url: '/api/kid/attempts', payload: { worksheetId } })
     expect((await ok<AttemptView>({ method: 'POST', url: `/api/kid/attempts/${third.id}/submit` })).result!.starsGained).toBe(0)
-    expect((await ok<KidHome>({ method: 'GET', url: '/api/kid/home' })).stars).toBe(3)
+    expect((await ok<KidHome>({ method: 'GET', url: '/api/kid/home' })).stars).toBe(5)
   })
 
   it('hết giờ: không lưu được nữa, server tự nộp với câu đã lưu trước hạn', async () => {

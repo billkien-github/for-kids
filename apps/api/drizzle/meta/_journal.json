@@ -15,6 +15,13 @@
       "when": 1792944463147,
       "tag": "0001_tough_micromax",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792946506780,
+      "tag": "0002_overconfident_shockwave",
+      "breakpoints": true
     }
   ]
 }

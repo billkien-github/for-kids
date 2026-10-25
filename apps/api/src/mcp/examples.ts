@@ -91,7 +91,17 @@ export const QUESTION_EXAMPLES: Record<string, QuestionInput> = {
   },
 }
 
-export const IMPORT_WORKSHEET_PROMPT = `Bạn nhập một bài tập từ file nguồn (PDF/ảnh/Word/Excel) vào app For-Kids.
+export const generatePracticePrompt = (childName?: string) => `Soạn một bài luyện tập cho ${childName ? `bé ${childName}` : 'một bé'} đúng chỗ bé còn yếu, trong app For-Kids.
+
+Quy trình:
+1. list_children để lấy childId${childName ? ` của ${childName}` : ''}.
+2. get_child_report: xem weakSkills (mức "needs_practice"), điểm theo môn, bài quá hạn.
+3. get_child_mistakes: xem các câu sai gần đây và bé đã trả lời gì, để đoán lỗi sai (vd. quên nhớ khi cộng qua 10, nhầm kim giờ/kim phút).
+4. Gọi get_question_schema, rồi soạn 8–12 câu mới (không chép lại nguyên câu cũ), cùng dạng và cùng kỹ năng với chỗ yếu, độ khó tăng dần. Gắn đúng skillCodes; viết explanation ngắn, dễ hiểu cho trẻ.
+5. create_worksheet với lớp của bé, tiêu đề dạng "Luyện tập: <kỹ năng>". Bài tính nhanh có thể dùng layout 'grid'.
+6. Báo lại cho phụ huynh nội dung bài vừa soạn. Chỉ publish_worksheet và assign_worksheet khi phụ huynh đồng ý.`
+
+export const IMPORT_WORKSHEET_PROMPT =`Bạn nhập một bài tập từ file nguồn (PDF/ảnh/Word/Excel) vào app For-Kids.
 
 Quy trình:
 1. Gọi get_question_schema để xem định dạng các loại câu hỏi, và list_catalog để biết môn/chủ đề/kỹ năng hiện có.

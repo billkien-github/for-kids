@@ -52,7 +52,7 @@ export function AttemptPage() {
           ✕
         </Link>
         <div className="min-w-0 flex-1">
-          <p className="truncate font-semibold">{view.worksheet?.title}</p>
+          <p className="truncate font-semibold">{view.worksheet?.title ?? '🔁 Ôn tập'}</p>
           <div className="mt-1 h-2 overflow-hidden rounded-full bg-slate-200">
             <div className="h-full bg-emerald-500 transition-all" style={{ width: `${(answeredCount / Math.max(1, questionCount)) * 100}%` }} />
           </div>

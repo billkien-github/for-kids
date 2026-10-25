@@ -3,11 +3,13 @@ import { and, desc, eq, sql } from 'drizzle-orm'
 import type { FastifyInstance, FastifyRequest } from 'fastify'
 import { requireKid, requireSession } from '../auth/session.js'
 import { findActiveChild } from '../db/children.js'
-import { question, starLedger, subject, topic, worksheet } from '../db/schema.js'
+import { question, subject, topic, worksheet } from '../db/schema.js'
 import type { Deps } from '../deps.js'
 import { idParam, parse } from '../http.js'
 import { listAssignments } from '../services/assignments.js'
-import { bestByWorksheet, getAttemptView, saveAnswers, startAttempt, submitAttempt } from '../services/attempts.js'
+import { bestByWorksheet, getAttemptView, saveAnswers, startAttempt, startReview, submitAttempt } from '../services/attempts.js'
+import { reviewDueCount, starBalance, streakFor } from '../services/progress.js'
+import { achievements, redeemReward } from '../services/rewards.js'
 
 /** API của bé (§7): mọi thứ giới hạn trong bé đang được chọn. */
 export function kidRoutes(app: FastifyInstance, deps: Deps) {
@@ -21,11 +23,6 @@ export function kidRoutes(app: FastifyInstance, deps: Deps) {
   app.get('/api/kid/home', { preHandler }, async (req): Promise<KidHome> => {
     const { familyId, childId } = kid(req)
     const c = (await findActiveChild(db, familyId, childId))!
-
-    const [balance] = await db
-      .select({ stars: sql<number>`coalesce(sum(${starLedger.delta}), 0)::int` })
-      .from(starLedger)
-      .where(eq(starLedger.childId, childId))
 
     const published = await db
       .select({
@@ -51,7 +48,9 @@ export function kidRoutes(app: FastifyInstance, deps: Deps) {
 
     return {
       child: { id: c.id, name: c.name, avatar: c.avatar, grade: c.grade },
-      stars: Number(balance?.stars ?? 0),
+      stars: await starBalance(db, childId),
+      streak: await streakFor(db, childId, deps.clock()),
+      reviewDue: await reviewDueCount(db, childId, deps.clock()),
       today: await listAssignments(db, familyId, { childId, pendingOnly: true, now: deps.clock() }),
       library: published.map(
         (w): LibraryItem => ({
@@ -81,5 +80,23 @@ export function kidRoutes(app: FastifyInstance, deps: Deps) {
 
   app.post<{ Params: { id: string } }>('/api/kid/attempts/:id/submit', { preHandler }, async (req) => {
     return submitAttempt(deps, kid(req).childId, idParam(req.params.id))
+  })
+
+  // Tạo (hoặc làm tiếp) phiên ôn câu sai (§5.4).
+  app.post('/api/kid/review', { preHandler }, async (req) => {
+    const { familyId, childId } = kid(req)
+    return startReview(deps, familyId, childId)
+  })
+
+  app.get('/api/kid/achievements', { preHandler }, async (req) => {
+    const { familyId, childId } = kid(req)
+    return achievements(deps, familyId, childId)
+  })
+
+  app.post<{ Params: { id: string } }>('/api/kid/rewards/:id/redeem', { preHandler }, async (req, reply) => {
+    const { familyId, childId } = kid(req)
+    const id = await redeemReward(deps, familyId, childId, idParam(req.params.id))
+    reply.code(201)
+    return { id }
   })
 }

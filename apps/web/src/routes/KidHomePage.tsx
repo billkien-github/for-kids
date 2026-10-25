@@ -21,17 +21,19 @@ export function KidHomePage() {
   if (me.data && !me.data.activeChild) return <Navigate to="/" replace />
   if (home.isPending) return <p className="p-8 text-center text-kid text-slate-500">Đang tải…</p>
   if (home.error) return <p className="p-8 text-center text-red-600">{errorMessage(home.error)}</p>
-  const { child, stars, today, library } = home.data
+  const { child, stars, streak, reviewDue, today, library } = home.data
 
-  const open = async (worksheetId: string, assignmentId?: string) => {
+  const go = async (start: () => Promise<AttemptView>) => {
     setError(null)
     try {
-      const attempt = await post<AttemptView>('/kid/attempts', { worksheetId, assignmentId })
+      const attempt = await start()
       navigate(`/kid/attempt/${attempt.id}`)
     } catch (err) {
       setError(errorMessage(err))
     }
   }
+  const open = (worksheetId: string, assignmentId?: string) => go(() => post<AttemptView>('/kid/attempts', { worksheetId, assignmentId }))
+  const startReview = () => go(() => post<AttemptView>('/kid/review'))
 
   const shown = allGrades ? library : library.filter((w) => w.grade === child.grade)
   const bySubject = new Map<string, LibraryItem[]>()
@@ -45,12 +47,32 @@ export function KidHomePage() {
           <p className="text-2xl font-bold">{child.name}</p>
           <p className="text-base text-slate-500">{gradeLabel(child.grade)}</p>
         </div>
-        <span className="ml-auto rounded-full bg-amber-100 px-4 py-2 text-xl font-bold">⭐ {stars}</span>
+        <span className="ml-auto rounded-full bg-orange-100 px-4 py-2 text-xl font-bold" title="Số ngày học liên tiếp">
+          🔥 {streak}
+        </span>
+        <Link to="/kid/achievements" className="rounded-full bg-amber-100 px-4 py-2 text-xl font-bold" title="Thành tích và đổi quà">
+          ⭐ {stars}
+        </Link>
         <Link to="/" className="flex min-h-touch items-center rounded-xl bg-slate-100 px-5 text-base">
           Đổi bé
         </Link>
       </header>
       {error && <p className="mx-6 mt-4 rounded-xl bg-red-50 p-3 text-red-700">{error}</p>}
+
+      <section className="flex flex-wrap gap-3 px-6 pt-6">
+        <button
+          type="button"
+          disabled={reviewDue === 0}
+          onClick={startReview}
+          className="flex min-h-touch flex-1 items-center gap-3 rounded-3xl bg-violet-600 px-5 py-4 text-left font-semibold text-white shadow-sm active:scale-[0.98] disabled:bg-slate-300"
+        >
+          <span className="text-3xl">🔁</span>
+          {reviewDue > 0 ? `Ôn tập: ${reviewDue} câu` : 'Hôm nay không có câu cần ôn'}
+        </button>
+        <Link to="/kid/achievements" className="flex min-h-touch items-center gap-3 rounded-3xl bg-white px-5 py-4 font-semibold shadow-sm">
+          <span className="text-3xl">🏆</span> Thành tích & quà
+        </Link>
+      </section>
 
       <section className="p-6">
         <h2 className="text-2xl font-bold">📌 Bài hôm nay</h2>

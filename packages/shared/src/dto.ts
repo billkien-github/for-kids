@@ -84,9 +84,109 @@ export type LibraryItem = {
 export type KidHome = {
   child: { id: string; name: string; avatar: string; grade: number }
   stars: number
+  streak: number
+  /** Số câu đến hạn ôn hôm nay. */
+  reviewDue: number
   today: AssignmentView[]
   library: LibraryItem[]
 }
+
+// ---------- Thành tích, quà ----------
+
+export type BadgeView = { code: string; name: string; icon: string; bonusStars: number; earnedAt: string | null }
+
+export type LedgerEntry = { id: string; delta: number; reason: 'worksheet' | 'review' | 'badge' | 'redeem' | 'manual'; note: string | null; createdAt: string }
+
+export type RewardView = { id: string; name: string; icon: string; costStars: number; active: boolean }
+
+export type RedemptionView = {
+  id: string
+  reward: { id: string; name: string; icon: string }
+  child: { id: string; name: string; avatar: string }
+  costStars: number
+  status: 'pending' | 'approved' | 'rejected'
+  createdAt: string
+  decidedAt: string | null
+}
+
+export type Achievements = {
+  stars: number
+  /** Số sao còn đổi được (trừ các yêu cầu đổi quà đang chờ duyệt). */
+  available: number
+  streak: number
+  badges: BadgeView[]
+  history: LedgerEntry[]
+  rewards: RewardView[]
+  redemptions: RedemptionView[]
+}
+
+export const RewardInput = z.object({
+  name: z.string().trim().min(1).max(60),
+  icon: z.string().trim().min(1).max(16),
+  costStars: z.number().int().min(1).max(10000),
+  active: z.boolean().default(true),
+})
+export type RewardInput = z.infer<typeof RewardInput>
+
+// ---------- Báo cáo ----------
+
+export type SkillLevel = 'unrated' | 'needs_practice' | 'improving' | 'mastered'
+
+export type SkillProgress = {
+  code: string
+  name: string
+  subjectCode: string
+  topic: string | null
+  mastery: number
+  answered: number
+  correct: number
+  level: SkillLevel
+  lastSeenAt: string | null
+}
+
+export type ChildReport = {
+  child: { id: string; name: string; avatar: string; grade: number }
+  range: { from: string; to: string }
+  streak: number
+  stars: number
+  /** Điểm trung bình lần chính thức (attempt_no = 1) theo môn. */
+  subjects: { subjectCode: string; subjectName: string; avgScorePct: number; worksheets: number }[]
+  /** Trung bình theo tuần (thứ Hai đầu tuần), lần chính thức. */
+  weekly: { weekStart: string; avgScorePct: number; attempts: number }[]
+  /** Số phút học mỗi ngày (mọi lần nộp, kể cả ôn tập). */
+  daily: { date: string; minutes: number; attempts: number }[]
+  skills: SkillProgress[]
+  weakSkills: SkillProgress[]
+  overdue: AssignmentView[]
+  pending: AssignmentView[]
+  recent: AttemptSummary[]
+  reviewDue: number
+}
+
+export type Mistake = {
+  attemptId: string
+  worksheetTitle: string | null
+  answeredAt: string
+  question: QuestionBody
+  response: unknown
+  score: number
+  skillCodes: string[]
+}
+
+// ---------- Cài đặt ----------
+
+export const ChangePinInput = z.object({ currentPin: z.string(), newPin: z.string().regex(/^\d{4}$/, 'PIN gồm 4 chữ số') })
+export const ChangePasswordInput = z.object({ currentPassword: z.string(), newPassword: z.string().min(8, 'Ít nhất 8 ký tự').max(200) })
+export const StarThresholdsInput = z
+  .object({ thresholds: z.tuple([z.number().int().min(1).max(100), z.number().int().min(1).max(100), z.number().int().min(1).max(100)]) })
+  .refine((v) => v.thresholds[0] < v.thresholds[1] && v.thresholds[1] < v.thresholds[2], {
+    path: ['thresholds'],
+    message: 'Ngưỡng phải tăng dần (1 sao < 2 sao < 3 sao)',
+  })
+
+export type FamilySettings = { name: string; starThresholds: [number, number, number] }
+
+export type McpAuditEntry = { id: string; tokenName: string; tool: string; argsSummary: unknown; ok: boolean; createdAt: string }
 
 // ---------- Làm bài ----------
 
@@ -123,10 +223,12 @@ export type AttemptView = {
   result: {
     scorePct: number
     stars: number
+    /** Tổng sao được cộng nhờ lần làm này (bài, phiên ôn, huy hiệu mới). */
     starsGained: number
     earnedPoints: number
     totalPoints: number
     items: AttemptItemResult[]
+    newBadges: { code: string; name: string; icon: string }[]
   } | null
 }
 

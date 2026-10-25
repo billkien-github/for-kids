@@ -2,6 +2,7 @@ import type { TokenInfo } from '@for-kids/shared'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
 import { api, errorMessage, post } from '../../api'
+import { McpAuditSection, PasswordSection, PinSection, StarThresholdsSection, VoiceSection } from './SettingsSections'
 
 const SCOPE_LABEL: Record<string, string> = {
   'content:write': 'tạo/sửa bài',
@@ -11,7 +12,7 @@ const SCOPE_LABEL: Record<string, string> = {
 }
 const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleString('vi-VN') : 'chưa dùng')
 
-/** Cài đặt (§6 phụ huynh, mục 6): token cho agent gọi MCP. */
+/** Cài đặt (§6 phụ huynh, mục 6): token MCP, ngưỡng sao, giọng đọc, PIN, mật khẩu, nhật ký MCP. */
 export function SettingsPage() {
   const queryClient = useQueryClient()
   const tokens = useQuery({ queryKey: ['parent', 'tokens'], queryFn: () => api<TokenInfo[]>('/parent/tokens') })
@@ -38,7 +39,7 @@ export function SettingsPage() {
     create.mutate()
   }
 
-  const claudeCommand = created ? `claude mcp add --transport http for-kids ${agentUrl} --header "Authorization: Bearer ${created}"` : ''
+  const claudeCommand = created ? `claude mcp add --scope user --transport http for-kids ${agentUrl} --header "Authorization: Bearer ${created}"` : ''
 
   return (
     <main className="mx-auto max-w-4xl p-6">
@@ -91,6 +92,12 @@ export function SettingsPage() {
           ))}
         </ul>
       </section>
+
+      <StarThresholdsSection />
+      <VoiceSection />
+      <PinSection />
+      <PasswordSection />
+      <McpAuditSection />
     </main>
   )
 }

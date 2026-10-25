@@ -14,6 +14,7 @@ import { kidRoutes } from './routes/kid.js'
 import { mcpRoutes } from './routes/mcp.js'
 import { parentChildrenRoutes } from './routes/parent-children.js'
 import { parentContentRoutes } from './routes/parent-content.js'
+import { parentSettingsRoutes } from './routes/parent-settings.js'
 
 export async function buildApp(deps: Deps) {
   const { config, db } = deps
@@ -49,6 +50,7 @@ export async function buildApp(deps: Deps) {
   authRoutes(app, deps)
   parentChildrenRoutes(app, deps)
   parentContentRoutes(app, deps)
+  parentSettingsRoutes(app, deps)
   assetRoutes(app, deps)
   kidRoutes(app, deps)
   mcpRoutes(app, deps)

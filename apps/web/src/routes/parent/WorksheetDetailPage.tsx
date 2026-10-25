@@ -4,9 +4,10 @@ import { useState, type FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import { api, errorMessage, post } from '../../api'
 import { Modal } from '../../components/Modal'
+import { draftFromDetail, WorksheetEditor } from '../../components/editor/WorksheetEditor'
 import { QuestionView } from '../../components/questions/QuestionView'
 
-type Tab = 'answers' | 'try' | 'json'
+type Tab = 'answers' | 'try' | 'edit' | 'json'
 
 /** Chi tiết bài: xem đáp án, thử làm như bé, sửa JSON, xuất bản, giao bài. */
 export function WorksheetDetailPage() {
@@ -75,7 +76,8 @@ export function WorksheetDetailPage() {
           [
             ['answers', 'Đáp án'],
             ['try', 'Thử làm như bé'],
-            ['json', 'Sửa (JSON)'],
+            ['edit', 'Sửa'],
+            ['json', 'JSON'],
           ] as const
         ).map(([t, label]) => (
           <button key={t} type="button" onClick={() => setTab(t)} className={`min-h-touch rounded-xl px-4 ${tab === t ? 'bg-slate-800 text-white' : 'bg-white shadow-sm'}`}>
@@ -84,7 +86,19 @@ export function WorksheetDetailPage() {
         ))}
       </div>
 
-      {tab === 'json' ? (
+      {tab === 'edit' ? (
+        <div className="mt-4">
+          <WorksheetEditor
+            key={w.updatedAt}
+            initial={draftFromDetail(w)}
+            saveLabel="Lưu thay đổi"
+            onSave={async (draft) => {
+              await api(`/parent/worksheets/${w.id}`, { method: 'PUT', body: draft })
+              await queryClient.invalidateQueries({ queryKey: key })
+            }}
+          />
+        </div>
+      ) : tab === 'json' ? (
         <JsonEditor worksheet={w} onSaved={() => queryClient.invalidateQueries({ queryKey: key })} />
       ) : (
         <ol className="mt-4 flex flex-col gap-4 text-kid">
@@ -127,22 +141,7 @@ function QuestionCard({ index, question, lang, mode }: { index: number; question
 }
 
 function JsonEditor({ worksheet, onSaved }: { worksheet: WorksheetDetail; onSaved: () => void }) {
-  const initial = {
-    title: worksheet.title,
-    grade: worksheet.grade,
-    topic: worksheet.topic,
-    description: worksheet.description,
-    lang: worksheet.lang,
-    layout: worksheet.layout,
-    timeLimitSec: worksheet.timeLimitSec,
-    questions: worksheet.questions.map(({ body, explanation, points, ttsLang, skillCodes }) => ({
-      body,
-      ...(explanation ? { explanation } : {}),
-      ...(points !== 1 && body.type !== 'info' ? { points } : {}),
-      ...(ttsLang ? { ttsLang } : {}),
-      ...(skillCodes.length ? { skillCodes } : {}),
-    })),
-  }
+  const initial = draftFromDetail(worksheet)
   const [text, setText] = useState(() => JSON.stringify(initial, null, 2))
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)

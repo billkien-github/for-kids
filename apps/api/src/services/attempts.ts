@@ -1,5 +1,8 @@
 import {
   gradeQuestion,
+  localDate,
+  REVIEW_SESSION_SIZE,
+  REVIEW_SESSION_STARS,
   sanitizeForKid,
   scorePercent,
   starsFor,
@@ -9,10 +12,23 @@ import {
   type QuestionBody,
   type SaveAnswersInput,
 } from '@for-kids/shared'
-import { and, asc, desc, eq, inArray, isNotNull, isNull, max, ne, sql } from 'drizzle-orm'
-import { assignment, attempt, attemptAnswer, child, family, question, starLedger, subject, worksheet } from '../db/schema.js'
+import { and, asc, count, desc, eq, inArray, isNotNull, isNull, lte, max, ne, sql } from 'drizzle-orm'
+import {
+  assignment,
+  attempt,
+  attemptAnswer,
+  child,
+  family,
+  question,
+  questionSkill,
+  reviewItem,
+  starLedger,
+  subject,
+  worksheet,
+} from '../db/schema.js'
 import type { Deps } from '../deps.js'
 import { HttpError } from '../http.js'
+import { applyProgress, awardBadges, badgesFromAttempt, familyTimezone, type DbOrTx } from './progress.js'
 
 /** Bản chụp câu hỏi lúc bắt đầu làm (§3): sửa bài sau đó không làm sai lịch sử. */
 export type QuestionSnapshot = {
@@ -21,6 +37,8 @@ export type QuestionSnapshot = {
   points: number
   ttsLang: string
   sortOrder: number
+  /** Kỹ năng gắn với câu lúc làm, để cập nhật mức thành thạo. Bản chụp cũ có thể thiếu. */
+  skillIds?: string[]
 }
 
 type AttemptRow = typeof attempt.$inferSelect
@@ -44,6 +62,35 @@ async function finalizeIfExpired(deps: Deps, a: AttemptRow): Promise<AttemptRow>
   if (!isExpired(deps, a)) return a
   await finalizeAttempt(deps, a.id, true)
   return loadAttempt(deps, a.childId, a.id)
+}
+
+/** Bản chụp cho một danh sách câu hỏi, giữ nguyên thứ tự truyền vào. */
+async function snapshotsFor(
+  db: DbOrTx,
+  qs: { id: string; body: QuestionBody; explanation: string | null; points: number; ttsLang: string | null; fallbackLang: string }[],
+) {
+  const links = qs.length
+    ? await db
+        .select()
+        .from(questionSkill)
+        .where(
+          inArray(
+            questionSkill.questionId,
+            qs.map((q) => q.id),
+          ),
+        )
+    : []
+  return qs.map((q, i) => ({
+    questionId: q.id,
+    questionSnapshot: {
+      body: q.body,
+      explanation: q.explanation,
+      points: q.points,
+      ttsLang: q.ttsLang ?? q.fallbackLang,
+      sortOrder: i,
+      skillIds: links.filter((l) => l.questionId === q.id).map((l) => l.skillId),
+    } satisfies QuestionSnapshot,
+  }))
 }
 
 export async function startAttempt(
@@ -90,6 +137,10 @@ export async function startAttempt(
 
   const qs = await db.select().from(question).where(eq(question.worksheetId, w.id)).orderBy(asc(question.sortOrder))
   if (qs.length === 0) throw new HttpError(409, { error: 'empty_worksheet', message: 'Bài chưa có câu hỏi' })
+  const snaps = await snapshotsFor(
+    db,
+    qs.map((q) => ({ ...q, fallbackLang: w.lang ?? w.subjectTtsLang })),
+  )
 
   const now = deps.clock()
   const id = await db.transaction(async (tx) => {
@@ -109,19 +160,54 @@ export async function startAttempt(
         deadlineAt: w.timeLimitSec ? new Date(now.getTime() + w.timeLimitSec * 1000) : null,
       })
       .returning({ id: attempt.id })
-    await tx.insert(attemptAnswer).values(
-      qs.map((q) => ({
-        attemptId: row!.id,
-        questionId: q.id,
-        questionSnapshot: {
-          body: q.body,
-          explanation: q.explanation,
-          points: q.points,
-          ttsLang: q.ttsLang ?? w.lang ?? w.subjectTtsLang,
-          sortOrder: q.sortOrder,
-        } satisfies QuestionSnapshot,
-      })),
-    )
+    await tx.insert(attemptAnswer).values(snaps.map((s) => ({ attemptId: row!.id, ...s })))
+    return row!.id
+  })
+  return getAttemptView(deps, childId, id)
+}
+
+/**
+ * Phiên ôn tập (§5.4): tối đa 10 câu đến hạn, ưu tiên hạn sớm và hộp thấp. Đang có phiên dở thì làm tiếp.
+ * Không giới hạn thời gian.
+ */
+export async function startReview(deps: Deps, familyId: string, childId: string): Promise<AttemptView> {
+  const { db } = deps
+  const [open] = await db
+    .select({ id: attempt.id })
+    .from(attempt)
+    .where(and(eq(attempt.childId, childId), eq(attempt.kind, 'review'), isNull(attempt.submittedAt)))
+  if (open) return getAttemptView(deps, childId, open.id)
+
+  const today = localDate(deps.clock(), await familyTimezone(db, childId))
+  const due = await db
+    .select({
+      id: question.id,
+      body: question.body,
+      explanation: question.explanation,
+      points: question.points,
+      ttsLang: question.ttsLang,
+      fallbackLang: sql<string>`coalesce(${worksheet.lang}, ${subject.ttsLang})`,
+    })
+    .from(reviewItem)
+    .innerJoin(question, eq(question.id, reviewItem.questionId))
+    .innerJoin(worksheet, eq(worksheet.id, question.worksheetId))
+    .innerJoin(subject, eq(subject.id, worksheet.subjectId))
+    .where(and(eq(reviewItem.childId, childId), eq(worksheet.familyId, familyId), lte(reviewItem.dueOn, today)))
+    .orderBy(asc(reviewItem.dueOn), asc(reviewItem.box))
+    .limit(REVIEW_SESSION_SIZE)
+  if (due.length === 0) throw new HttpError(409, { error: 'nothing_to_review', message: 'Hôm nay chưa có câu nào cần ôn' })
+
+  const snaps = await snapshotsFor(db, due)
+  const id = await db.transaction(async (tx) => {
+    const [{ n }] = (await tx
+      .select({ n: count() })
+      .from(attempt)
+      .where(and(eq(attempt.childId, childId), eq(attempt.kind, 'review')))) as [{ n: number }]
+    const [row] = await tx
+      .insert(attempt)
+      .values({ childId, worksheetId: null, kind: 'review', attemptNo: Number(n) + 1, startedAt: deps.clock() })
+      .returning({ id: attempt.id })
+    await tx.insert(attemptAnswer).values(snaps.map((s) => ({ attemptId: row!.id, ...s })))
     return row!.id
   })
   return getAttemptView(deps, childId, id)
@@ -163,6 +249,7 @@ async function finalizeAttempt(deps: Deps, attemptId: string, auto: boolean) {
 
     const answers = await tx.select().from(attemptAnswer).where(eq(attemptAnswer.attemptId, attemptId))
     const scored: { score: number; points: number }[] = []
+    const progress: { questionId: string | null; skillIds: string[]; score: number }[] = []
     for (const ans of answers) {
       const snap = ans.questionSnapshot as QuestionSnapshot
       const score = gradeQuestion(snap.body, ans.response)
@@ -170,12 +257,15 @@ async function finalizeAttempt(deps: Deps, attemptId: string, auto: boolean) {
         .update(attemptAnswer)
         .set({ score, isCorrect: score === null ? null : score === 1 })
         .where(eq(attemptAnswer.id, ans.id))
-      if (score !== null) scored.push({ score, points: snap.points })
+      if (score !== null) {
+        scored.push({ score, points: snap.points })
+        progress.push({ questionId: ans.questionId, skillIds: snap.skillIds ?? [], score })
+      }
     }
     const { total, earned, pct } = scorePercent(scored)
 
     const [fam] = await tx
-      .select({ thresholds: family.starThresholds })
+      .select({ thresholds: family.starThresholds, tz: family.timezone })
       .from(family)
       .innerJoin(child, eq(child.familyId, family.id))
       .where(eq(child.id, a.childId))
@@ -192,8 +282,11 @@ async function finalizeAttempt(deps: Deps, attemptId: string, auto: boolean) {
       })
       .where(eq(attempt.id, attemptId))
 
-    // §5.1: mỗi bộ bài chỉ cộng phần chênh lệch so với số sao cao nhất từng đạt.
-    if (a.kind === 'normal' && a.worksheetId && stars > 0) {
+    if (a.kind === 'review') {
+      // §5.4: làm xong phiên ôn được +1 sao.
+      await tx.insert(starLedger).values({ childId: a.childId, delta: REVIEW_SESSION_STARS, reason: 'review', refId: attemptId, note: 'Ôn tập' })
+    } else if (a.worksheetId && stars > 0) {
+      // §5.1: mỗi bộ bài chỉ cộng phần chênh lệch so với số sao cao nhất từng đạt.
       const [prev] = (await tx
         .select({ best: max(attempt.stars) })
         .from(attempt)
@@ -207,9 +300,13 @@ async function finalizeAttempt(deps: Deps, attemptId: string, auto: boolean) {
         )) as [{ best: number | null }]
       const delta = stars - (prev.best ?? 0)
       if (delta > 0) {
-        await tx.insert(starLedger).values({ childId: a.childId, delta, reason: 'worksheet', refId: attemptId })
+        const [w] = await tx.select({ title: worksheet.title }).from(worksheet).where(eq(worksheet.id, a.worksheetId))
+        await tx.insert(starLedger).values({ childId: a.childId, delta, reason: 'worksheet', refId: attemptId, note: w?.title ?? null })
       }
     }
+
+    await applyProgress(tx, a, progress, submittedAt, localDate(submittedAt, fam?.tz ?? 'Asia/Ho_Chi_Minh'))
+    await awardBadges(tx, a.childId, attemptId, submittedAt)
   })
 }
 
@@ -230,12 +327,14 @@ export async function getAttemptView(deps: Deps, childId: string, attemptId: str
   const submitted = a.submittedAt !== null
 
   let starsGained = 0
+  let newBadges: { code: string; name: string; icon: string }[] = []
   if (submitted) {
     const [g] = await db
       .select({ sum: sql<number>`coalesce(sum(${starLedger.delta}), 0)::int` })
       .from(starLedger)
       .where(and(eq(starLedger.refId, a.id), eq(starLedger.childId, childId)))
     starsGained = Number(g?.sum ?? 0)
+    newBadges = await badgesFromAttempt(db, childId, a.id)
   }
 
   return {
@@ -269,6 +368,7 @@ export async function getAttemptView(deps: Deps, childId: string, attemptId: str
             const snap = ans.questionSnapshot as QuestionSnapshot
             return { id: ans.id, body: snap.body, score: ans.score, isCorrect: ans.isCorrect, explanation: snap.explanation }
           }),
+          newBadges,
         }
       : null,
   }

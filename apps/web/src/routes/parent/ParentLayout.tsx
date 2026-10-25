@@ -5,9 +5,11 @@ import { PinPad } from '../../components/PinPad'
 import { usePinSubmit } from '../../usePinSubmit'
 
 const NAV = [
+  { to: '/parent/overview', label: 'Tổng quan' },
   { to: '/parent/worksheets', label: 'Bài tập' },
   { to: '/parent/assignments', label: 'Giao bài' },
   { to: '/parent/results', label: 'Kết quả' },
+  { to: '/parent/rewards', label: 'Quà' },
   { to: '/parent/children', label: 'Hồ sơ các bé' },
   { to: '/parent/settings', label: 'Cài đặt' },
 ] as const

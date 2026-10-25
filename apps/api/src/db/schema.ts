@@ -282,6 +282,8 @@ export const starLedger = pgTable(
     delta: integer('delta').notNull(),
     reason: starReason('reason').notNull(),
     refId: uuid('ref_id'),
+    // Mô tả ngắn để hiện trong lịch sử sao (tên bài, tên huy hiệu, tên quà).
+    note: text('note'),
     createdAt: createdAt(),
   },
   (t) => [index().on(t.childId, t.createdAt)],
@@ -302,6 +304,8 @@ export const childBadge = pgTable(
     childId: uuid('child_id').notNull().references(() => child.id),
     badgeId: uuid('badge_id').notNull().references(() => badge.id),
     earnedAt: ts('earned_at').notNull().defaultNow(),
+    // Lần làm bài khiến bé đạt huy hiệu (để màn kết quả hiện "huy hiệu mới").
+    attemptId: uuid('attempt_id').references(() => attempt.id, { onDelete: 'set null' }),
   },
   (t) => [primaryKey({ columns: [t.childId, t.badgeId] })],
 )

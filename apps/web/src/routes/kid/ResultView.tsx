@@ -45,16 +45,27 @@ export function ResultView({ view, timeUp, readOnly }: { view: AttemptView; time
     <main className={`min-h-dvh text-kid ${readOnly ? '' : 'bg-sky-50'}`}>
       <section className="flex flex-col items-center gap-3 bg-white px-4 py-8 text-center shadow-sm">
         {timeUp && <p className="rounded-full bg-amber-100 px-4 py-1 text-amber-800">⏰ Hết giờ, bài đã được nộp</p>}
-        <p className="text-slate-500">{view.worksheet?.title}</p>
+        <p className="text-slate-500">{view.worksheet?.title ?? '🔁 Ôn tập'}</p>
         <Stars count={result.stars} />
         <p className="text-5xl font-bold">{Math.round(result.scorePct)}%</p>
         {!readOnly && <p className="text-2xl">{cheer(result.scorePct)}</p>}
         {result.starsGained > 0 && !readOnly && <p className="text-amber-700">Con được thêm {result.starsGained} ⭐</p>}
+        {result.newBadges.length > 0 && (
+          <div className="mt-2 flex flex-wrap justify-center gap-3">
+            {result.newBadges.map((b) => (
+              <span key={b.code} className="animate-bounce rounded-2xl bg-amber-100 px-4 py-2 font-semibold">
+                {b.icon} Huy hiệu mới: {b.name}
+              </span>
+            ))}
+          </div>
+        )}
         {!readOnly && (
           <div className="mt-2 flex gap-3">
-            <button type="button" onClick={retry} className="min-h-touch rounded-2xl bg-sky-600 px-6 font-bold text-white">
-              🔁 Làm lại
-            </button>
+            {view.worksheet && (
+              <button type="button" onClick={retry} className="min-h-touch rounded-2xl bg-sky-600 px-6 font-bold text-white">
+                🔁 Làm lại
+              </button>
+            )}
             <Link to="/kid" className="flex min-h-touch items-center rounded-2xl bg-slate-200 px-6 font-semibold">
               🏠 Về trang chủ
             </Link>

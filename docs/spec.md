@@ -83,8 +83,8 @@ Kiểu dữ liệu chung: `id` dùng uuid, timestamp dùng `timestamptz`. Múi g
 ### Kết quả và động viên
 - `skill_mastery(child_id, skill_id, mastery real 0..1, answered int, correct int, last_seen_at)`: PK `(child_id, skill_id)`.
 - `review_item(child_id, question_id, box smallint 1..5, due_on date, wrong_count, last_answered_at)`: PK `(child_id, question_id)`.
-- `star_ledger(id, child_id, delta int, reason worksheet|review|badge|redeem|manual, ref_id, created_at)`: số dư sao = tổng `delta`.
-- `badge(id, code, name, icon, rule jsonb, bonus_stars)` và `child_badge(child_id, badge_id, earned_at)`
+- `star_ledger(id, child_id, delta int, reason worksheet|review|badge|redeem|manual, ref_id, note null, created_at)`: số dư sao = tổng `delta`; `note` là mô tả ngắn để hiện lịch sử (tên bài, huy hiệu, quà).
+- `badge(id, code, name, icon, rule jsonb, bonus_stars)` và `child_badge(child_id, badge_id, earned_at, attempt_id null)`: `attempt_id` là lần làm bài khiến bé đạt huy hiệu.
 - `reward(id, family_id, name, icon, cost_stars, active)` và `reward_redemption(id, child_id, reward_id, cost_stars, status pending|approved|rejected, created_at, decided_at)`
 - `mcp_audit(id, token_id, tool, args_summary jsonb, ok bool, created_at)`
 
@@ -311,6 +311,12 @@ Test: Vitest. Ưu tiên test hàm chấm điểm (kể cả `split_strategy` và
 | **P1 — làm được bài** | Đăng nhập, profile + PIN, khoá khu phụ huynh. Soạn bài, xem trước, xuất bản. 7 loại câu hỏi gốc cùng `split_strategy` và `info`; `RichText.clock`, `sub`, phân số; ô trống kiểu `time` và `choice`. Làm bài (mỗi màn 1 câu và lưới), giới hạn thời gian + tự nộp, đọc đề bằng giọng trình duyệt, nộp, chấm, làm lại. Giao bài. Seed chủ đề/kỹ năng Toán. Báo cáo cơ bản (điểm theo bài/môn). MCP: `list_*`, `upload_asset`, `create/update/get_worksheet`, `publish`, `assign`. Docker Compose + ngrok. |
 | **P2 — học có theo dõi** | `clock_set`, `column_arith`. Gắn kỹ năng + mức thành thạo, báo cáo kỹ năng yếu, ôn câu sai, sao + streak. MCP: `get_child_report`, `get_child_mistakes`, prompts. |
 | **P3 — động viên** | Huy hiệu, đổi quà, biểu đồ xu hướng, nhật ký MCP trên giao diện, sao lưu tự động. |
+
+**Trạng thái** (2026-10-26): P1, P2, P3 đã làm, trừ sao lưu tự động (để sau) và chạy như Windows service (không cần). Khác với bản đặc tả ban đầu:
+- Nối cột và sắp xếp dùng **chạm** (chạm trái rồi chạm phải để nối; nút ↑↓ để sắp xếp) thay vì kéo thả dnd-kit, cho dễ thao tác với trẻ nhỏ.
+- Trình soạn bài có dạng form cho cả 11 loại câu (tải ảnh, đồng hồ, dòng dịch, gắn kỹ năng, xem như bé) và một tab JSON nâng cao.
+- MCP có thêm đường dẫn `/agent` (§8) và tool `get_question_schema`.
+- Trang Tổng quan phụ huynh: điểm theo môn, biểu đồ điểm theo tuần và số phút học mỗi ngày, kỹ năng (mức thành thạo), bài chưa làm, câu sai gần đây.
 
 ## 13. Vấn đề còn mở
 Hiện không còn vấn đề mở.
