@@ -4,6 +4,20 @@
   /* Chữ cho bé ≥ 20px, vùng chạm ≥ 48px (§6 spec). */
   --text-kid: 1.25rem;
   --spacing-touch: 3rem;
+  --animate-shake: shake 0.3s;
+
+  @keyframes shake {
+    0%,
+    100% {
+      transform: translateX(0);
+    }
+    25% {
+      transform: translateX(-8px);
+    }
+    75% {
+      transform: translateX(8px);
+    }
+  }
 }
 
 html {

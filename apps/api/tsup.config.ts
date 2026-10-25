@@ -8,4 +8,6 @@ export default defineConfig({
   clean: true,
   // shared là mã nguồn TS trong workspace nên phải gộp vào bundle.
   noExternal: ['@for-kids/shared'],
+  // Chỉ dùng khi dev (DATABASE_URL=pglite:…), không đưa vào bundle production.
+  external: ['@electric-sql/pglite'],
 })

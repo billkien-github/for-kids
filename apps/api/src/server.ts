@@ -1,18 +1,18 @@
 import { buildApp } from './app.js'
 import { loadConfig } from './config.js'
-import { createDb } from './db/client.js'
-import { runMigrations } from './db/migrate.js'
+import { openDb } from './db/client.js'
+import { createDeps } from './deps.js'
 
 const config = loadConfig()
-await runMigrations(config.DATABASE_URL)
+const conn = await openDb(config.DATABASE_URL)
+await conn.migrate()
 
-const { db, pool } = createDb(config.DATABASE_URL)
-const app = await buildApp(config, db)
+const app = await buildApp(createDeps(config, conn.db))
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.once(signal, async () => {
     await app.close()
-    await pool.end()
+    await conn.close()
     process.exit(0)
   })
 }
