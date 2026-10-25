@@ -1,18 +1,21 @@
 @echo off
-rem Build app, chay app o cong 3000 (cua so rieng), roi mo ngrok de truy cap tu Internet.
+rem Build app, chay app o cong PUBLIC_PORT (mac dinh 3100, cua so rieng), roi mo ngrok de truy cap tu Internet.
+rem Cong rieng voi "pnpm dev" (api 3000, web 5173) nen chay song song duoc.
 rem Can NGROK_AUTHTOKEN va NGROK_DOMAIN trong file .env.
 rem Bo qua buoc build: start-public.cmd nobuild
 setlocal
 cd /d "%~dp0"
 
-set "PORT=3000"
+set "PUBLIC_PORT=3100"
 for /f "usebackq eol=# tokens=1,* delims==" %%a in (".env") do (
   if "%%a"=="NGROK_AUTHTOKEN" set "NGROK_AUTHTOKEN=%%b"
   if "%%a"=="NGROK_DOMAIN" set "NGROK_DOMAIN=%%b"
-  if "%%a"=="PORT" set "PORT=%%b"
+  if "%%a"=="PUBLIC_PORT" set "PUBLIC_PORT=%%b"
 )
 if not defined NGROK_AUTHTOKEN goto :missing_env
 if not defined NGROK_DOMAIN goto :missing_env
+rem "pnpm start" doc PORT tu bien moi truong truoc, roi moi toi .env (PORT cua dev).
+set "PORT=%PUBLIC_PORT%"
 set "NGROK_DOMAIN=%NGROK_DOMAIN:https://=%"
 set "NGROK_DOMAIN=%NGROK_DOMAIN:/=%"
 
@@ -27,7 +30,7 @@ if not "%NGROK%"=="ngrok" if not exist "%NGROK%" (
 
 netstat -ano | findstr /r /c:"LISTENING" | findstr /c:":%PORT% " >nul
 if not errorlevel 1 (
-  echo [loi] Cong %PORT% dang bi chiem. Tat "pnpm dev" hoac app dang chay roi thu lai.
+  echo [loi] Cong %PORT% dang bi chiem. Dat PUBLIC_PORT khac trong .env, hoac tat app dang chay o cong nay.
   exit /b 1
 )
 

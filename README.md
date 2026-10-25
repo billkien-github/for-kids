@@ -36,6 +36,8 @@ pnpm dev                    # api :3000, web :5173 (proxy /api sang api)
 
 Chưa cài Docker thì đặt `DATABASE_URL=pglite:./data/pglite` trong `.env`. Lệnh này dùng Postgres nhúng (PGlite), dữ liệu lưu ở `apps/api/data/pglite`. Chỉ dùng để dev, không dùng cho bản chạy thật.
 
+Chạy song song bản public (`start-public.cmd`, cổng `PUBLIC_PORT`, mặc định 3100) và `pnpm dev` được, vì hai bên dùng cổng khác nhau và chung một database.
+
 Mở từ iPad trong cùng mạng: `http://<IP máy>:5173`. Khi chạy bản build qua http trong mạng LAN thì đặt `COOKIE_SECURE=false`.
 
 | Lệnh | Việc |
