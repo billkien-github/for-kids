@@ -1,6 +1,6 @@
 import { AVATARS, GRADE_MAX, GRADE_MIN, gradeLabel, type ChildInput, type Profile } from '@for-kids/shared'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useRef, useState, type FormEvent } from 'react'
+import { useLayoutEffect, useRef, useState, type FormEvent } from 'react'
 import { api, errorMessage } from '../../api'
 import { Modal } from '../../components/Modal'
 
@@ -19,9 +19,13 @@ export function ChildrenSection() {
   })
 
   // Kéo thả: `order` là thứ tự tạm trong lúc kéo/lưu, null = theo server.
+  // `drag.grab` = khoảng cách từ đỉnh thẻ tới chỗ ngón tay chạm, để thẻ bám theo tay không bị giật.
   const [order, setOrder] = useState<Profile[] | null>(null)
-  const [dragId, setDragId] = useState<string | null>(null)
+  const [drag, setDrag] = useState<{ id: string; grab: number; y: number } | null>(null)
+  const dragId = drag?.id ?? null
+  const listRef = useRef<HTMLUListElement>(null)
   const rows = useRef(new Map<string, HTMLLIElement>())
+  const lastTops = useRef(new Map<string, number>())
   const reorder = useMutation({
     mutationFn: (ids: string[]) => api<Profile[]>('/parent/children/order', { method: 'PUT', body: { ids } }),
     onSuccess: (saved) => {
@@ -42,14 +46,44 @@ export function ChildrenSection() {
     return [...rest.slice(0, index), from.find((c) => c.id === id)!, ...rest.slice(index)]
   }
   const onDragMove = (clientY: number) => {
-    if (!dragId) return
-    // Vị trí mới = số bé khác có tâm nằm trên ngón tay/chuột.
+    const el = drag && rows.current.get(drag.id)
+    const listTop = listRef.current?.getBoundingClientRect().top
+    if (!drag || !el || listTop === undefined) return
+    setDrag({ ...drag, y: clientY })
+    // Vị trí mới = số bé khác có tâm (theo layout, bỏ qua hiệu ứng trượt) nằm trên tâm thẻ đang kéo.
+    const center = clientY - drag.grab - listTop + el.offsetHeight / 2
     const index = list.filter((c) => {
-      const r = c.id !== dragId && rows.current.get(c.id)?.getBoundingClientRect()
-      return r && r.top + r.height / 2 < clientY
+      const r = c.id !== drag.id && rows.current.get(c.id)
+      return r && r.offsetTop + r.offsetHeight / 2 < center
     }).length
-    if (list[index]?.id !== dragId) setOrder(moveTo(list, dragId, index))
+    if (list[index]?.id !== drag.id) setOrder(moveTo(list, drag.id, index))
   }
+  const endDrag = (save: boolean) => {
+    const el = drag && rows.current.get(drag.id)
+    if (el?.style.transform) {
+      // Thả tay: thẻ trượt từ chỗ đang cầm về đúng ô.
+      el.animate([{ transform: el.style.transform }, { transform: 'none' }], { duration: 160, easing: 'ease-out' })
+      el.style.transform = ''
+    }
+    setDrag(null)
+    if (save) commit(list)
+    else setOrder(null)
+  }
+
+  useLayoutEffect(() => {
+    // Thẻ đang kéo bám theo tay: lệch từ ô của nó (layout) tới chỗ ngón tay.
+    const el = drag && rows.current.get(drag.id)
+    const listTop = listRef.current?.getBoundingClientRect().top
+    if (drag && el && listTop !== undefined) el.style.transform = `translateY(${drag.y - drag.grab - listTop - el.offsetTop}px) scale(1.02)`
+    // Các thẻ khác đổi ô thì trượt tới chỗ mới (FLIP) thay vì nhảy.
+    for (const [id, row] of rows.current) {
+      const prev = lastTops.current.get(id)
+      if (id !== drag?.id && prev !== undefined && prev !== row.offsetTop) {
+        row.animate([{ transform: `translateY(${prev - row.offsetTop}px)` }, { transform: 'none' }], { duration: 200, easing: 'ease-out' })
+      }
+      lastTops.current.set(id, row.offsetTop)
+    }
+  })
 
   return (
     <section className="mt-6">
@@ -64,7 +98,7 @@ export function ChildrenSection() {
       {children.error && <p className="mt-6 text-red-600">{errorMessage(children.error)}</p>}
       {list.length > 1 && <p className="mt-2 text-sm text-slate-500">Kéo ⠿ để sắp thứ tự. Các con hiện theo thứ tự này ở màn chọn người học và mọi danh sách.</p>}
       {reorder.error && <p className="mt-2 text-red-600">{errorMessage(reorder.error)}</p>}
-      <ul className="mt-4 flex flex-col gap-3">
+      <ul ref={listRef} className={`relative mt-4 flex flex-col gap-3 ${dragId ? 'select-none' : ''}`}>
         {list.map((c, i) => (
           <li
             key={c.id}
@@ -72,7 +106,7 @@ export function ChildrenSection() {
               if (el) rows.current.set(c.id, el)
               else rows.current.delete(c.id)
             }}
-            className={`flex items-center gap-4 rounded-2xl bg-white p-4 shadow-sm transition-shadow ${dragId === c.id ? 'relative z-10 shadow-lg ring-2 ring-sky-400' : ''}`}
+            className={`flex items-center gap-4 rounded-2xl bg-white p-4 transition-shadow ${dragId === c.id ? 'relative z-10 shadow-xl ring-2 ring-sky-400' : 'shadow-sm'}`}
           >
             {list.length > 1 && (
               <button
@@ -80,18 +114,14 @@ export function ChildrenSection() {
                 aria-label={`Kéo để đổi thứ tự của ${c.name} (hoặc dùng phím mũi tên lên/xuống)`}
                 disabled={reorder.isPending}
                 onPointerDown={(e) => {
+                  const row = rows.current.get(c.id)
+                  if (!row) return
                   e.currentTarget.setPointerCapture(e.pointerId)
-                  setDragId(c.id)
+                  setDrag({ id: c.id, grab: e.clientY - row.getBoundingClientRect().top, y: e.clientY })
                 }}
                 onPointerMove={(e) => onDragMove(e.clientY)}
-                onPointerUp={() => {
-                  setDragId(null)
-                  commit(list)
-                }}
-                onPointerCancel={() => {
-                  setDragId(null)
-                  setOrder(null)
-                }}
+                onPointerUp={() => endDrag(true)}
+                onPointerCancel={() => endDrag(false)}
                 onKeyDown={(e) => {
                   const to = e.key === 'ArrowUp' ? i - 1 : e.key === 'ArrowDown' ? i + 1 : null
                   if (to === null || to < 0 || to >= list.length) return
