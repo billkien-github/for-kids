@@ -1,5 +1,6 @@
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
+import { Readable } from 'node:stream'
 import type { Deps } from '../deps.js'
 import { buildMcpServer } from '../mcp/server.js'
 import { verifyToken } from '../services/tokens.js'
@@ -66,7 +67,9 @@ function registerMcpPath(app: FastifyInstance, deps: Deps, path: string) {
     res.headers.forEach((value, name) => {
       if (!HOP_BY_HOP.has(name)) reply.header(name, value)
     })
-    return body
+    // Gửi dạng stream (chunked), không kèm content-length: Avast viết lại response có content-length của
+    // request mang header mcp-protocol-version thành "chunked" mà không mã hoá chunk → client nhận body rỗng.
+    return Readable.from([body])
   })
 
   // Stateless: không có luồng SSE (GET) hay phiên để xoá (DELETE).

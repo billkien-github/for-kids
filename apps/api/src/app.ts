@@ -58,7 +58,17 @@ export async function buildApp(deps: Deps) {
   const webDist = config.WEB_DIST_DIR && path.resolve(config.WEB_DIST_DIR)
   const serveWeb = Boolean(webDist && fs.existsSync(webDist))
   if (serveWeb) {
-    await app.register(fastifyStatic, { root: webDist as string, wildcard: false })
+    await app.register(fastifyStatic, {
+      root: webDist as string,
+      wildcard: false,
+      cacheControl: false,
+      setHeaders: (reply, filePath) => {
+        // File trong assets/ có mã băm trong tên → cache vĩnh viễn. Còn lại (index.html, version.json…)
+        // luôn hỏi lại server, để iPad (nhất là web app ở màn hình chính) nhận bản mới.
+        const hashed = filePath.replace(/\\/g, '/').includes('/assets/')
+        reply.header('cache-control', hashed ? 'public, max-age=31536000, immutable' : 'no-cache')
+      },
+    })
   } else if (webDist) {
     app.log.warn(`WEB_DIST_DIR=${webDist} không tồn tại, không phục vụ web`)
   }

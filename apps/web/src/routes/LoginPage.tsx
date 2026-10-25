@@ -27,7 +27,8 @@ export function LoginPage() {
   return (
     <main className="flex min-h-dvh items-center justify-center bg-amber-50 p-6">
       <form onSubmit={submit} className="flex w-full max-w-sm flex-col gap-4 rounded-3xl bg-white p-8 shadow">
-        <h1 className="text-center text-2xl font-bold">Phụ huynh đăng nhập</h1>
+        <h1 className="text-center text-2xl font-bold">Chào bố mẹ 👋</h1>
+        <p className="-mt-2 text-center text-sm text-slate-500">Đăng nhập một lần, iPad sẽ nhớ trong 90 ngày.</p>
         <label className="flex flex-col gap-1">
           Email
           <input
@@ -56,7 +57,7 @@ export function LoginPage() {
           </p>
         )}
         <button disabled={login.isPending} className="min-h-touch rounded-xl bg-slate-800 font-semibold text-white disabled:opacity-50">
-          {login.isPending ? 'Đang đăng nhập…' : 'Đăng nhập'}
+          {login.isPending ? 'Đang vào…' : 'Vào app'}
         </button>
       </form>
     </main>

@@ -67,8 +67,8 @@ export function PinPad({ title, subtitle, error, onSubmit, onCancel }: Props) {
         )}
       </div>
       {onCancel && (
-        <button type="button" onClick={onCancel} className="min-h-touch px-6 text-slate-500 underline">
-          Huỷ
+        <button type="button" onClick={onCancel} className="min-h-touch px-6 text-slate-500">
+          Hủy
         </button>
       )}
     </div>

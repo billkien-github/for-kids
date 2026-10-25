@@ -18,7 +18,7 @@ export function AttemptPage() {
   const [error, setError] = useState<string | null>(null)
   const [timeUp, setTimeUp] = useState(false)
 
-  if (query.isPending) return <p className="p-8 text-center text-kid text-slate-500">Đang mở bài…</p>
+  if (query.isPending) return <p className="p-8 text-center text-kid text-slate-500">Đang mở bài, chờ chút nhé…</p>
   if (query.error) return <p className="p-8 text-center text-red-600">{errorMessage(query.error)}</p>
   const view = query.data
   if (view.submittedAt) return <ResultView view={view} timeUp={timeUp || view.autoSubmitted} />
@@ -48,11 +48,11 @@ export function AttemptPage() {
   return (
     <main className="flex min-h-dvh flex-col bg-sky-50 text-kid">
       <header className="sticky top-0 z-10 flex items-center gap-3 bg-white/95 px-4 py-3 shadow-sm backdrop-blur">
-        <Link to="/kid" className="flex min-h-touch items-center rounded-xl px-3 text-base text-slate-500" aria-label="Thoát (bài được lưu lại)">
-          ✕
+        <Link to="/kid" className="flex min-h-touch shrink-0 items-center rounded-xl bg-slate-100 px-3 text-base text-slate-600" title="Bài đã được lưu, lúc khác con làm tiếp nhé">
+          ← Để sau
         </Link>
         <div className="min-w-0 flex-1">
-          <p className="truncate font-semibold">{view.worksheet?.title ?? '🔁 Ôn tập'}</p>
+          <p className="truncate font-semibold">{view.worksheet?.title ?? '🔁 Ôn bài'}</p>
           <div className="mt-1 h-2 overflow-hidden rounded-full bg-slate-200">
             <div className="h-full bg-emerald-500 transition-all" style={{ width: `${(answeredCount / Math.max(1, questionCount)) * 100}%` }} />
           </div>
@@ -80,14 +80,14 @@ export function AttemptPage() {
           ))}
           <div className="col-span-full flex justify-center py-4">
             <button type="button" onClick={() => setReviewing(true)} className="min-h-touch rounded-2xl bg-emerald-600 px-10 py-3 text-2xl font-bold text-white">
-              Nộp bài
+              Xong rồi, nộp bài!
             </button>
           </div>
         </div>
       ) : (
         <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col p-4">
           <p className="mb-2 text-base text-slate-500">
-            Câu {index + 1} / {items.length}
+            Câu {index + 1} trên {items.length}
           </p>
           <section key={item.id} className="flex-1 rounded-3xl bg-white p-6 shadow-sm">
             <QuestionView body={item.body} response={responses[item.id]} onChange={(r) => setResponse(item.id, r)} lang={item.ttsLang} />
@@ -99,15 +99,15 @@ export function AttemptPage() {
               onClick={() => setIndex(index - 1)}
               className="min-h-touch flex-1 rounded-2xl bg-white py-3 font-semibold shadow-sm disabled:opacity-30"
             >
-              ← Câu trước
+              ← Quay lại
             </button>
             {isLast ? (
               <button type="button" onClick={() => setReviewing(true)} className="min-h-touch flex-1 rounded-2xl bg-emerald-600 py-3 font-bold text-white">
-                Xem lại & nộp
+                Xong rồi! Kiểm tra lại
               </button>
             ) : (
               <button type="button" onClick={() => setIndex(index + 1)} className="min-h-touch flex-1 rounded-2xl bg-sky-600 py-3 font-bold text-white">
-                Câu sau →
+                Tiếp theo →
               </button>
             )}
           </nav>
@@ -131,7 +131,7 @@ export function AttemptPage() {
         </Modal>
       )}
       {submitting && !reviewing && (
-        <div className="fixed inset-0 z-20 flex items-center justify-center bg-white/70 text-2xl font-bold">{timeUp ? '⏰ Hết giờ! Đang nộp bài…' : 'Đang nộp bài…'}</div>
+        <div className="fixed inset-0 z-20 flex items-center justify-center bg-white/70 text-2xl font-bold">{timeUp ? '⏰ Hết giờ rồi! Đang nộp bài cho con…' : 'Đang nộp bài…'}</div>
       )}
     </main>
   )
@@ -148,7 +148,7 @@ function ReviewBeforeSubmit(props: {
   const missing = props.view.items.filter((i) => i.body.type !== 'info' && !props.answered(i)).length
   return (
     <div className="flex w-[min(32rem,85vw)] flex-col gap-5 text-kid">
-      <h2 className="text-2xl font-bold">Xem lại trước khi nộp</h2>
+      <h2 className="text-2xl font-bold">Con kiểm tra lại nhé</h2>
       <div className="grid grid-cols-5 gap-2">
         {props.view.items.map((it, i) => {
           const ok = it.body.type === 'info' || props.answered(it)
@@ -165,7 +165,7 @@ function ReviewBeforeSubmit(props: {
         })}
       </div>
       <p className={missing ? 'text-amber-700' : 'text-emerald-700'}>
-        {missing ? `Còn ${missing} câu chưa làm. Chạm vào số để làm tiếp.` : 'Con đã làm hết rồi! 🎉'}
+        {missing ? `Còn ${missing} câu con chưa làm. Chạm vào ô màu vàng để làm tiếp nhé.` : 'Con đã làm hết rồi! 🎉'}
       </p>
       {props.error && <p className="text-red-600">{props.error}</p>}
       <button
@@ -174,7 +174,7 @@ function ReviewBeforeSubmit(props: {
         onClick={props.onSubmit}
         className="min-h-touch rounded-2xl bg-emerald-600 py-3 text-2xl font-bold text-white disabled:opacity-50"
       >
-        {props.submitting ? 'Đang nộp…' : 'Nộp bài'}
+        {props.submitting ? 'Đang nộp…' : missing ? 'Nộp luôn' : 'Nộp bài!'}
       </button>
     </div>
   )

@@ -29,12 +29,12 @@ export const post = <T>(path: string, body: unknown = {}) => api<T>(path, { meth
 export function errorMessage(err: unknown): string {
   if (err instanceof ApiError) {
     if (err.status === 429 && err.body.retryAfterSec) {
-      return `Thử sai nhiều quá, đợi ${Math.ceil(err.body.retryAfterSec / 60)} phút nữa nhé`
+      return `Thử sai nhiều quá rồi, đợi ${Math.ceil(err.body.retryAfterSec / 60)} phút rồi thử lại nhé`
     }
     if (err.body.issues?.length) return err.body.issues.map((i) => `${i.path}: ${i.message}`).join('; ')
     return err.body.message ?? err.body.error
   }
-  return 'Không kết nối được máy chủ'
+  return 'Mất kết nối, kiểm tra mạng rồi thử lại nhé'
 }
 
 export const meQueryKey = ['me'] as const

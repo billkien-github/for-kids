@@ -1,10 +1,9 @@
 // Khu phụ huynh được tách thành một chunk riêng, chỉ tải khi phụ huynh mở (màn của bé tải nhẹ hơn).
 export { AssignmentsPage } from './AssignmentsPage'
-export { ChildrenPage } from './ChildrenPage'
 export { NewWorksheetPage } from './NewWorksheetPage'
 export { OverviewPage } from './OverviewPage'
 export { ParentLayout } from './ParentLayout'
-export { ParentAttemptPage, ResultsPage } from './ResultsPage'
+export { ParentAttemptPage } from './ResultsPage'
 export { RewardsPage } from './RewardsPage'
 export { SettingsPage } from './SettingsPage'
 export { WorksheetDetailPage } from './WorksheetDetailPage'

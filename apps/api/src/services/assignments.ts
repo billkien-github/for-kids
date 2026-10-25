@@ -10,7 +10,7 @@ export async function assignWorksheet(db: Db, familyId: string, input: AssignInp
     .from(worksheet)
     .where(and(eq(worksheet.familyId, familyId), eq(worksheet.id, input.worksheetId)))
   if (!w) throw new HttpError(404, { error: 'not_found', message: 'Không có bài này' })
-  if (w.status !== 'published') throw new HttpError(409, { error: 'not_published', message: 'Chỉ giao được bài đã xuất bản' })
+  if (w.status !== 'published') throw new HttpError(409, { error: 'not_published', message: 'Bài này chưa mở cho con. Bấm "Mở cho con làm" trước rồi giao nhé' })
 
   const childIds = [...new Set(input.childIds)]
   const kids = await db

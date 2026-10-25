@@ -48,6 +48,8 @@ export const child = pgTable('child', {
   avatar: text('avatar').notNull(),
   grade: smallint('grade').notNull(), // 0 = mầm non
   pinHash: text('pin_hash'),
+  // Thứ tự ưu tiên phụ huynh kéo thả; mọi danh sách bé đều sắp theo trường này.
+  sortOrder: integer('sort_order').notNull().default(0),
   createdAt: createdAt(),
   archivedAt: ts('archived_at'),
 })

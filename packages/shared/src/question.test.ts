@@ -88,6 +88,15 @@ describe('WorksheetInput', () => {
     expect(issuePaths(r)).toEqual(['questions.1.body.type'])
   })
 
+  it('câu info nhận points 0 (dữ liệu đọc từ get_worksheet gửi lại được), câu chấm điểm thì không', () => {
+    const info = { body: { type: 'info', prompt: { text: 'Số 2' } } }
+    expect(WorksheetInput.safeParse({ ...base, questions: [{ ...info, points: 0 }] }).success).toBe(true)
+    expect(WorksheetInput.safeParse({ ...base, questions: [{ ...info, points: 1 }] }).success).toBe(false)
+    const tf = { body: { type: 'true_false', prompt: { text: '1 + 1 = 2' }, answer: true } }
+    expect(WorksheetInput.safeParse({ ...base, questions: [{ ...tf, points: 0 }] }).success).toBe(false)
+    expect(WorksheetInput.safeParse({ ...base, questions: [{ ...tf, points: 2 }] }).success).toBe(true)
+  })
+
   it('mặc định layout là one_per_screen', () => {
     const r = WorksheetInput.parse({ ...base, questions: [{ body: { type: 'info', prompt: { text: 'Số 2' } } }] })
     expect(r.layout).toBe('one_per_screen')

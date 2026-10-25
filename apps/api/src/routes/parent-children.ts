@@ -1,9 +1,9 @@
 import { hash } from '@node-rs/argon2'
-import { ChildInput, type Profile } from '@for-kids/shared'
+import { ChildInput, ReorderChildrenInput, type Profile } from '@for-kids/shared'
 import { eq } from 'drizzle-orm'
 import type { FastifyInstance } from 'fastify'
 import { requireParent, requireSession } from '../auth/session.js'
-import { findActiveChild, listActiveChildren } from '../db/children.js'
+import { findActiveChild, listActiveChildren, nextSortOrder, reorderChildren } from '../db/children.js'
 import { child, session } from '../db/schema.js'
 import type { Deps } from '../deps.js'
 import { HttpError, idParam, parse } from '../http.js'
@@ -36,10 +36,20 @@ export function parentChildrenRoutes(app: FastifyInstance, deps: Deps) {
         avatar: input.avatar,
         grade: input.grade,
         pinHash: input.pin ? await hash(input.pin) : null,
+        sortOrder: nextSortOrder(auth.familyId),
       })
       .returning()
     reply.code(201)
     return toProfile(c!)
+  })
+
+  app.put('/api/parent/children/order', { preHandler }, async (req): Promise<Profile[]> => {
+    const auth = requireSession(req)
+    const { ids } = parse(ReorderChildrenInput, req.body)
+    if (!(await reorderChildren(db, auth.familyId, ids))) {
+      throw new HttpError(409, { error: 'stale_children', message: 'Danh sách các con vừa thay đổi. Tải lại trang rồi sắp xếp lại nhé' })
+    }
+    return (await listActiveChildren(db, auth.familyId)).map(toProfile)
   })
 
   app.put<{ Params: { id: string } }>('/api/parent/children/:id', { preHandler }, async (req): Promise<Profile> => {

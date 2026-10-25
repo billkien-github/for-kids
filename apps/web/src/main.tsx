@@ -4,9 +4,11 @@ import { createRoot } from 'react-dom/client'
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router'
 import { ApiError, meQueryKey } from './api'
 import { RequireAuth } from './components/RequireAuth'
+import { UpdateChecker } from './components/UpdateChecker'
 import './index.css'
 import { AchievementsPage } from './routes/kid/AchievementsPage'
 import { AttemptPage } from './routes/kid/AttemptPage'
+import { KidLayout } from './routes/kid/KidLayout'
 import { KidHomePage } from './routes/KidHomePage'
 import { LoginPage } from './routes/LoginPage'
 import { ProfilesPage } from './routes/ProfilesPage'
@@ -37,9 +39,15 @@ const router = createBrowserRouter([
     element: <RequireAuth />,
     children: [
       { path: '/', element: <ProfilesPage /> },
-      { path: '/kid', element: <KidHomePage /> },
+      {
+        // Khung chung có thanh tab cho con; màn làm bài nằm ngoài để con tập trung.
+        element: <KidLayout />,
+        children: [
+          { path: '/kid', element: <KidHomePage /> },
+          { path: '/kid/achievements', element: <AchievementsPage /> },
+        ],
+      },
       { path: '/kid/attempt/:id', element: <AttemptPage /> },
-      { path: '/kid/achievements', element: <AchievementsPage /> },
       {
         path: '/parent',
         lazy: parentPage('ParentLayout'),
@@ -51,10 +59,10 @@ const router = createBrowserRouter([
           { path: 'worksheets/new', lazy: parentPage('NewWorksheetPage') },
           { path: 'worksheets/:id', lazy: parentPage('WorksheetDetailPage') },
           { path: 'assignments', lazy: parentPage('AssignmentsPage') },
-          { path: 'results', lazy: parentPage('ResultsPage') },
+          { path: 'results', element: <Navigate to="/parent/overview?tab=history" replace /> },
           { path: 'attempts/:id', lazy: parentPage('ParentAttemptPage') },
-          { path: 'children', lazy: parentPage('ChildrenPage') },
-          { path: 'settings', lazy: parentPage('SettingsPage') },
+          { path: 'children', element: <Navigate to="/parent/settings/children" replace /> },
+          { path: 'settings/:section?', lazy: parentPage('SettingsPage') },
         ],
       },
     ],
@@ -66,6 +74,7 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <RouterProvider router={router} />
+      <UpdateChecker />
     </QueryClientProvider>
   </StrictMode>,
 )

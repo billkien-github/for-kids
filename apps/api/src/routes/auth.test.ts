@@ -196,6 +196,23 @@ describe('chọn profile', () => {
   const select = (id: string, pin?: string) =>
     call({ method: 'POST', url: `/api/profiles/${id}/select`, payload: pin ? { pin } : {} })
 
+  it('sắp xếp thứ tự các bé, áp dụng cho mọi danh sách; bé mới đứng cuối', async () => {
+    const names = async (url: string) => (await call({ method: 'GET', url })).json<Profile[]>().map((p) => p.name)
+    const order = (ids: string[]) => call({ method: 'PUT', url: '/api/parent/children/order', payload: { ids } })
+
+    expect((await order([binh.id, an.id])).statusCode).toBe(200)
+    expect(await names('/api/parent/children')).toEqual(['Bình', 'An'])
+    expect(await names('/api/profiles')).toEqual(['Bình', 'An'])
+
+    await addChild({ name: 'Chi' })
+    expect(await names('/api/profiles')).toEqual(['Bình', 'An', 'Chi'])
+
+    // Thiếu bé, trùng bé → 409, thứ tự giữ nguyên.
+    expect((await order([an.id, binh.id])).statusCode).toBe(409)
+    expect((await order([an.id, an.id, binh.id])).statusCode).toBe(409)
+    expect(await names('/api/profiles')).toEqual(['Bình', 'An', 'Chi'])
+  })
+
   it('bé không có PIN chọn được ngay; chọn bé thì khu phụ huynh bị khoá', async () => {
     expect((await select(an.id)).statusCode).toBe(200)
     const me = (await call({ method: 'GET', url: '/api/auth/me' })).json<Me>()

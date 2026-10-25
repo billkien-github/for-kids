@@ -6,14 +6,16 @@ import {
   StarThresholdsInput,
   type FamilySettings,
   type McpAuditEntry,
+  type ParentSummary,
 } from '@for-kids/shared'
-import { desc, eq } from 'drizzle-orm'
+import { and, count, desc, eq } from 'drizzle-orm'
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { requireParent, requireSession } from '../auth/session.js'
-import { apiToken, family, mcpAudit, parentUser } from '../db/schema.js'
+import { apiToken, family, mcpAudit, parentUser, worksheet } from '../db/schema.js'
 import type { Deps } from '../deps.js'
 import { HttpError, idParam, parse } from '../http.js'
+import { listAssignments } from '../services/assignments.js'
 import { childMistakes, childReport } from '../services/report.js'
 import { createReward, decideRedemption, listRedemptions, listRewards, updateReward } from '../services/rewards.js'
 
@@ -66,6 +68,23 @@ export function parentSettingsRoutes(app: FastifyInstance, deps: Deps) {
 
   // ---------- Cài đặt ----------
 
+  app.get('/api/parent/summary', { preHandler }, async (req): Promise<ParentSummary> => {
+    const familyId = requireSession(req).familyId
+    const [pending, assignments, [drafts]] = await Promise.all([
+      listRedemptions(db, familyId, { status: 'pending' }),
+      listAssignments(db, familyId, { pendingOnly: true, now: deps.clock() }),
+      db
+        .select({ n: count() })
+        .from(worksheet)
+        .where(and(eq(worksheet.familyId, familyId), eq(worksheet.status, 'draft'))),
+    ])
+    return {
+      pendingRedemptions: pending.length,
+      overdueAssignments: assignments.filter((a) => a.overdue).length,
+      draftWorksheets: Number(drafts?.n ?? 0),
+    }
+  })
+
   app.get('/api/parent/settings', { preHandler }, async (req): Promise<FamilySettings> => {
     const [f] = await db.select().from(family).where(eq(family.id, requireSession(req).familyId))
     return { name: f!.name, starThresholds: f!.starThresholds as [number, number, number] }
@@ -84,7 +103,7 @@ export function parentSettingsRoutes(app: FastifyInstance, deps: Deps) {
     deps.limits.pin.hit(key)
     const [u] = await db.select().from(parentUser).where(eq(parentUser.id, auth.parentUserId))
     if (!u || !(await verify(u.parentPinHash, input.currentPin))) {
-      throw new HttpError(401, { error: 'wrong_pin', message: 'PIN hiện tại chưa đúng' })
+      throw new HttpError(401, { error: 'wrong_pin', message: 'Mã PIN đang dùng chưa đúng' })
     }
     deps.limits.pin.reset(key)
     await db.update(parentUser).set({ parentPinHash: await hash(input.newPin) }).where(eq(parentUser.id, u.id))
@@ -98,7 +117,7 @@ export function parentSettingsRoutes(app: FastifyInstance, deps: Deps) {
     deps.limits.login.hit(key)
     const [u] = await db.select().from(parentUser).where(eq(parentUser.id, auth.parentUserId))
     if (!u || !(await verify(u.passwordHash, input.currentPassword))) {
-      throw new HttpError(401, { error: 'wrong_password', message: 'Mật khẩu hiện tại chưa đúng' })
+      throw new HttpError(401, { error: 'wrong_password', message: 'Mật khẩu đang dùng chưa đúng' })
     }
     deps.limits.login.reset(key)
     await db.update(parentUser).set({ passwordHash: await hash(input.newPassword) }).where(eq(parentUser.id, u.id))

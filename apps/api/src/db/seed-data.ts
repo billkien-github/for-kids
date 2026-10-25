@@ -1,4 +1,4 @@
-// Dữ liệu seed (§3 spec). Chủ đề Toán lấy theo các dạng bài trong docs/samples, không theo bộ sách nào.
+// Dữ liệu seed (§3 spec). Chủ đề Toán lấy theo các dạng bài trong docs/loaded, không theo bộ sách nào.
 
 export const SUBJECTS = [
   { code: 'math', name: 'Toán', ttsLang: 'vi-VN' },

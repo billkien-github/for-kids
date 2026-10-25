@@ -204,13 +204,15 @@ export const QuestionInput = z
   .object({
     body: QuestionBody,
     explanation: z.string().max(4000).optional(),
-    points: z.number().positive().max(100).optional(),
+    // Nhận cả 0 để dữ liệu đọc từ get_worksheet (câu info có points 0) gửi lại nguyên văn được.
+    points: z.number().min(0).max(100).optional(),
     ttsLang: lang.optional(),
     skillCodes: z.array(z.string().min(1)).optional(),
   })
-  .refine((q) => !(q.body.type === 'info' && q.points !== undefined && q.points !== 0), {
-    path: ['points'],
-    message: 'Câu info không tính điểm',
+  .superRefine((q, ctx) => {
+    if (q.points === undefined) return
+    if (q.body.type === 'info' && q.points !== 0) ctx.addIssue({ code: 'custom', path: ['points'], message: 'Câu info không tính điểm' })
+    if (q.body.type !== 'info' && q.points === 0) ctx.addIssue({ code: 'custom', path: ['points'], message: 'Câu có chấm điểm phải có điểm lớn hơn 0' })
   })
 
 const WorksheetFields = z.object({

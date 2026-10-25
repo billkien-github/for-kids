@@ -122,7 +122,7 @@ export function WorksheetEditor({ initial, onSave, saveLabel }: { initial: Works
     <form onSubmit={submit} className="flex flex-col gap-4">
       <section className="grid grid-cols-1 gap-3 rounded-2xl bg-white p-4 shadow-sm sm:grid-cols-2">
         <label className="flex flex-col gap-1 text-sm sm:col-span-2">
-          Tên bài
+          Tên bài (con sẽ thấy)
           <input value={draft.title} onChange={(e) => set({ title: e.target.value })} required className={fieldClass} />
         </label>
         <label className="flex flex-col gap-1 text-sm">
@@ -146,7 +146,7 @@ export function WorksheetEditor({ initial, onSave, saveLabel }: { initial: Works
           </select>
         </label>
         <label className="flex flex-col gap-1 text-sm">
-          Chủ đề (chọn hoặc gõ mới)
+          Chủ đề (chọn có sẵn hoặc gõ mới)
           <input list="topic-options" value={draft.topic ?? ''} onChange={(e) => set({ topic: e.target.value || null })} className={fieldClass} />
           <datalist id="topic-options">
             {topics.map((t) => (
@@ -157,20 +157,20 @@ export function WorksheetEditor({ initial, onSave, saveLabel }: { initial: Works
         <label className="flex flex-col gap-1 text-sm">
           Ngôn ngữ đọc đề
           <select value={draft.lang ?? ''} onChange={(e) => set({ lang: e.target.value || null })} className={fieldClass}>
-            <option value="">Theo môn</option>
+            <option value="">Theo môn học</option>
             <option value="vi-VN">Tiếng Việt (vi-VN)</option>
             <option value="en-US">Tiếng Anh (en-US)</option>
           </select>
         </label>
         <label className="flex flex-col gap-1 text-sm">
-          Bố cục
+          Cách hiện câu hỏi
           <select value={draft.layout} onChange={(e) => set({ layout: e.target.value as WorksheetDraft['layout'] })} className={fieldClass}>
-            <option value="one_per_screen">Mỗi màn 1 câu</option>
-            <option value="grid">Lưới (nhiều câu một màn, cho bài tính nhanh)</option>
+            <option value="one_per_screen">Mỗi lần một câu</option>
+            <option value="grid">Nhiều câu một màn (hợp bài tính nhanh)</option>
           </select>
         </label>
         <label className="flex flex-col gap-1 text-sm">
-          Giới hạn thời gian (phút, để trống = không giới hạn)
+          Thời gian làm bài (phút, để trống nếu không giới hạn)
           <input
             type="number"
             min={0}
@@ -181,7 +181,7 @@ export function WorksheetEditor({ initial, onSave, saveLabel }: { initial: Works
           />
         </label>
         <label className="flex flex-col gap-1 text-sm sm:col-span-2">
-          Mô tả
+          Ghi chú cho bài (không bắt buộc)
           <input value={draft.description ?? ''} onChange={(e) => set({ description: e.target.value || null })} className={fieldClass} />
         </label>
       </section>
@@ -213,8 +213,8 @@ export function WorksheetEditor({ initial, onSave, saveLabel }: { initial: Works
         <button disabled={saving} className="min-h-touch rounded-xl bg-slate-800 px-6 font-semibold text-white disabled:opacity-50">
           {saving ? 'Đang lưu…' : saveLabel}
         </button>
-        {saved && <span className="text-emerald-700">Đã lưu.</span>}
-        {issues.length > 0 && <span className="text-red-600">Còn {issues.length} lỗi, xem ở các câu được đánh dấu đỏ.</span>}
+        {saved && <span className="text-emerald-700">✓ Đã lưu.</span>}
+        {issues.length > 0 && <span className="text-red-600">Còn {issues.length} chỗ cần sửa, xem các câu có viền đỏ nhé.</span>}
         {error && <span className="whitespace-pre-line text-red-600">{error}</span>}
         {general.map((g) => (
           <span key={g.path + g.message} className="text-sm text-red-600">
@@ -229,7 +229,7 @@ export function WorksheetEditor({ initial, onSave, saveLabel }: { initial: Works
 function AddQuestion({ onAdd }: { onAdd: (t: QuestionType) => void }) {
   return (
     <div className="flex flex-wrap gap-2 rounded-2xl border-2 border-dashed border-slate-300 p-3">
-      <span className="w-full text-sm text-slate-500">+ Thêm câu:</span>
+      <span className="w-full text-sm text-slate-500">➕ Thêm câu hỏi:</span>
       {QUESTION_TYPES.map((t) => (
         <button key={t} type="button" onClick={() => onAdd(t)} className="min-h-11 rounded-lg bg-white px-3 text-sm shadow-sm">
           {TYPE_LABEL[t]}
@@ -278,7 +278,7 @@ function QuestionCard(props: {
         </select>
         <div className="ml-auto flex gap-1">
           <button type="button" onClick={() => setPreview(!preview)} className="min-h-11 rounded-lg bg-sky-50 px-3 text-sm">
-            {preview ? 'Soạn' : '👁 Xem như bé'}
+            {preview ? '✏️ Soạn tiếp' : '👀 Xem như con'}
           </button>
           <button type="button" onClick={() => props.onMove(index - 1)} disabled={index === 0} className="min-h-11 w-10 rounded-lg bg-slate-100 disabled:opacity-30" aria-label="Lên">
             ↑
@@ -305,7 +305,7 @@ function QuestionCard(props: {
       )}
 
       <label className="flex flex-col gap-1 text-sm">
-        Lời giải (hiện sau khi nộp)
+        Lời giải ngắn cho con (hiện sau khi nộp bài)
         <input value={q.explanation ?? ''} onChange={(e) => onChange({ ...q, explanation: e.target.value || undefined })} className={fieldClass} />
       </label>
 

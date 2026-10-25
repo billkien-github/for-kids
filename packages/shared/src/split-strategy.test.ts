@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { deriveSplit } from './split-strategy.js'
 
 describe('deriveSplit', () => {
-  // Các câu làm mẫu lấy từ docs/samples (Math-Drills).
+  // Các câu làm mẫu lấy từ docs/loaded (Math-Drills).
   it.each([
     ['+', 7, 6, 10, [7, 3, 3, 13]],
     ['+', 6, 5, 10, [6, 4, 1, 11]],

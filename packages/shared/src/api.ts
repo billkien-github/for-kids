@@ -23,6 +23,9 @@ export const ChildInput = z.object({
   pin: Pin.nullable().optional(),
 })
 
+/** Thứ tự ưu tiên các bé: đủ id các bé đang hoạt động, bé đầu tiên đứng đầu. */
+export const ReorderChildrenInput = z.object({ ids: z.array(z.uuid()).min(1).max(50) })
+
 export type LoginInput = z.infer<typeof LoginInput>
 export type ChildInput = z.infer<typeof ChildInput>
 

@@ -1,18 +1,25 @@
-import { gradeLabel, type WorksheetStatus, type WorksheetSummary } from '@for-kids/shared'
-import { useQuery } from '@tanstack/react-query'
-import { useState } from 'react'
-import { Link } from 'react-router'
+import { gradeLabel, type ParentSummary, type WorksheetStatus, type WorksheetSummary } from '@for-kids/shared'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { Link, useSearchParams } from 'react-router'
 import { api, errorMessage } from '../../api'
+import { WORKSHEET_STATUS } from '../../copy'
 
-const TABS: { status: WorksheetStatus; label: string }[] = [
-  { status: 'draft', label: 'Nháp' },
-  { status: 'published', label: 'Đã xuất bản' },
-  { status: 'archived', label: 'Lưu trữ' },
-]
+const ORDER: WorksheetStatus[] = ['draft', 'published', 'archived']
 
-/** Danh sách bài tập (§6 phụ huynh, mục 2). */
+const EMPTY: Record<WorksheetStatus, string> = {
+  draft: 'Không có bài nào đang soạn.',
+  published: 'Chưa có bài nào mở cho con. Mở một bài đang soạn để con thấy trong kho bài nhé.',
+  archived: 'Chưa cất bài nào.',
+}
+
+/** Kho bài (§6 phụ huynh, mục 2). */
 export function WorksheetsPage() {
-  const [status, setStatus] = useState<WorksheetStatus>('draft')
+  const queryClient = useQueryClient()
+  const [params, setParams] = useSearchParams()
+  // Mặc định: có bài đang soạn thì mở tab đó (việc cần làm), không thì xem bài đang mở cho con.
+  const drafts = queryClient.getQueryData<ParentSummary>(['parent', 'summary'])?.draftWorksheets ?? 0
+  const fromUrl = params.get('status') as WorksheetStatus | null
+  const status: WorksheetStatus = fromUrl && ORDER.includes(fromUrl) ? fromUrl : drafts > 0 ? 'draft' : 'published'
   const list = useQuery({
     queryKey: ['parent', 'worksheets', status],
     queryFn: () => api<WorksheetSummary[]>(`/parent/worksheets?status=${status}`),
@@ -21,31 +28,31 @@ export function WorksheetsPage() {
   return (
     <main className="mx-auto max-w-4xl p-6">
       <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-2xl font-bold">Bài tập</h1>
-        <Link to="/parent/worksheets/new" className="ml-auto flex min-h-touch items-center rounded-xl bg-slate-800 px-5 text-white">
-          + Tạo bài (JSON)
+        <h1 className="text-2xl font-bold">Kho bài</h1>
+        <Link to="/parent/worksheets/new" className="ml-auto flex min-h-touch items-center rounded-xl bg-slate-800 px-5 font-semibold text-white">
+          ✨ Soạn bài mới
         </Link>
       </div>
-      <div className="mt-4 flex gap-2">
-        {TABS.map((t) => (
+      <p className="mt-1 text-sm text-slate-500">Mẹo: nhờ trợ lý AI soạn bài từ file PDF/ảnh (Cài đặt → Trợ lý AI), bài sẽ nằm ở mục "Đang soạn" để bố mẹ xem lại.</p>
+
+      <div className="mt-4 flex gap-1 rounded-xl bg-slate-200/60 p-1 sm:w-fit">
+        {ORDER.map((s) => (
           <button
-            key={t.status}
+            key={s}
             type="button"
-            onClick={() => setStatus(t.status)}
-            className={`min-h-touch rounded-xl px-4 ${status === t.status ? 'bg-slate-800 text-white' : 'bg-white shadow-sm'}`}
+            onClick={() => setParams({ status: s }, { replace: true })}
+            className={`min-h-11 flex-1 rounded-lg px-4 text-sm font-medium whitespace-nowrap ${status === s ? 'bg-white shadow-sm' : 'text-slate-600'}`}
           >
-            {t.label}
+            {WORKSHEET_STATUS[s].tab}
+            {s === 'draft' && drafts > 0 ? ` (${drafts})` : ''}
           </button>
         ))}
       </div>
+      <p className="mt-2 text-sm text-slate-400">{WORKSHEET_STATUS[status].hint}</p>
 
       {list.isPending && <p className="mt-6 text-slate-500">Đang tải…</p>}
       {list.error && <p className="mt-6 text-red-600">{errorMessage(list.error)}</p>}
-      {list.data?.length === 0 && (
-        <p className="mt-6 text-slate-500">
-          Chưa có bài nào. Agent tạo bài qua MCP (xem <Link to="/parent/settings" className="underline">Cài đặt</Link>) hoặc bấm "Tạo bài".
-        </p>
-      )}
+      {list.data?.length === 0 && <p className="mt-6 text-slate-500">{EMPTY[status]}</p>}
       <ul className="mt-4 flex flex-col gap-2">
         {list.data?.map((w) => (
           <li key={w.id}>
@@ -56,10 +63,10 @@ export function WorksheetsPage() {
                   {w.subjectName} · {gradeLabel(w.grade)}
                   {w.topic ? ` · ${w.topic}` : ''} · {w.questionCount} câu
                   {w.timeLimitSec ? ` · ⏱ ${Math.round(w.timeLimitSec / 60)} phút` : ''}
-                  {w.layout === 'grid' ? ' · dạng lưới' : ''}
+                  {w.layout === 'grid' ? ' · nhiều câu một màn' : ''}
                 </p>
               </div>
-              <span className="text-sm text-slate-400">{w.source === 'mcp' ? '🤖 agent' : '✍️ tự soạn'}</span>
+              <span className="text-sm text-slate-400">{w.source === 'mcp' ? '🤖 AI soạn' : '✍️ Bố mẹ soạn'}</span>
             </Link>
           </li>
         ))}

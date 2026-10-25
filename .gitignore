@@ -3,4 +3,7 @@ dist/
 .env
 *.log
 data/
-docs/samples/
+docs/loaded/*
+!docs/loaded/.gitkeep
+docs/processing/*
+!docs/processing/.gitkeep

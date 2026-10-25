@@ -1,6 +1,6 @@
 import { blankMatches, columnArithResult, deriveSplit, gradeQuestion } from '@for-kids/shared'
 import { RichText } from '../RichText'
-import { field, inputClass, type QuestionProps } from './common'
+import { field, handwrittenDigits, inputClass, type QuestionProps } from './common'
 
 function ResultBadge({ ok, expected }: { ok: boolean; expected: string }) {
   return ok ? (
@@ -41,17 +41,19 @@ export function FillBlank({ body, solution, response, onChange, lang }: Question
       )
     }
     const kind = blank.input ?? 'text'
+    // Ô số/giờ: giữ dấu thập phân, dấu âm, dấu phân cách giờ.
+    const keep = kind === 'number' ? '.,-' : kind === 'time' ? ':.hH ' : null
     return (
       <span className="mx-1 inline-flex items-center align-middle">
         <input
           value={value}
           disabled={!!solution}
-          onChange={(e) => set(id, e.target.value)}
+          onChange={(e) => set(id, keep === null ? e.target.value : handwrittenDigits(e.target.value, keep))}
           inputMode={kind === 'number' ? 'decimal' : kind === 'time' ? 'numeric' : 'text'}
           placeholder={kind === 'time' ? 'h:mm' : ''}
           autoComplete="off"
           autoCapitalize="off"
-          className={`${inputClass} ${kind === 'text' ? 'w-40' : 'w-24'} ${color}`}
+          className={`${inputClass} ${kind === 'text' ? 'w-40' : 'w-24 pointer-coarse:w-28'} ${color}`}
         />
         {solved && <ResultBadge ok={!!ok} expected={solved.accept[0]!} />}
       </span>
@@ -68,7 +70,7 @@ export function NumberInput({ body, solution, response, onChange }: QuestionProp
       <input
         value={value}
         disabled={!!solution}
-        onChange={(e) => onChange({ value: e.target.value })}
+        onChange={(e) => onChange({ value: handwrittenDigits(e.target.value, '.,-') })}
         inputMode="decimal"
         autoComplete="off"
         className={`${inputClass} w-36 text-3xl`}
@@ -93,11 +95,11 @@ export function SplitStrategy({ body, solution, response, onChange }: QuestionPr
         <input
           value={cells[i] ?? ''}
           disabled={!!solution}
-          onChange={(e) => set(i, e.target.value.replace(/\D/g, ''))}
+          onChange={(e) => set(i, handwrittenDigits(e.target.value))}
           inputMode="numeric"
           autoComplete="off"
           aria-label={['Số giữ lại', 'Số để tròn chục', 'Số còn lại', 'Kết quả'][i]}
-          className={`${inputClass} w-20 ${ok === null ? '' : ok ? 'border-emerald-500!' : 'border-red-400!'}`}
+          className={`${inputClass} w-20 pointer-coarse:w-24 ${ok === null ? '' : ok ? 'border-emerald-500!' : 'border-red-400!'}`}
         />
         {solution && expected && !ok && <span className="text-base text-emerald-700">{expected.cells[i]}</span>}
       </span>
@@ -145,11 +147,11 @@ export function ColumnArith({ body, solution, response, onChange }: QuestionProp
         <input
           value={result}
           disabled={!!solution}
-          onChange={(e) => onChange({ result: e.target.value.replace(/\D/g, '') })}
+          onChange={(e) => onChange({ result: handwrittenDigits(e.target.value) })}
           inputMode="numeric"
           autoComplete="off"
           aria-label="Kết quả"
-          className={`mt-1 w-full rounded-lg border-2 bg-white px-1 text-right font-mono text-4xl outline-none ${
+          className={`mt-1 w-full rounded-lg border-2 bg-white px-1 text-right font-mono text-4xl outline-none pointer-coarse:min-h-16 ${
             ok === null ? 'border-slate-300 focus:border-sky-500' : ok ? 'border-emerald-500' : 'border-red-400'
           }`}
         />

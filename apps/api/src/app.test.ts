@@ -58,11 +58,16 @@ describe('app', () => {
   it('phục vụ web build, đường dẫn SPA trả về index.html, /api lạ trả 404 JSON', async () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'web-dist-'))
     fs.writeFileSync(path.join(dir, 'index.html'), '<div id="root"></div>')
+    fs.mkdirSync(path.join(dir, 'assets'))
+    fs.writeFileSync(path.join(dir, 'assets', 'index-abc123.js'), 'console.log(1)')
     const t = await createTestApp({ WEB_DIST_DIR: dir })
 
     const spa = await t.app.inject({ method: 'GET', url: '/parent/settings' })
     expect(spa.statusCode).toBe(200)
     expect(spa.body).toContain('id="root"')
+    expect(spa.headers['cache-control']).toBe('no-cache')
+    const asset = await t.app.inject({ method: 'GET', url: '/assets/index-abc123.js' })
+    expect(asset.headers['cache-control']).toBe('public, max-age=31536000, immutable')
 
     const missing = await t.app.inject({ method: 'GET', url: '/api/khong-co' })
     expect(missing.statusCode).toBe(404)

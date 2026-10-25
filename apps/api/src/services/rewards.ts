@@ -85,7 +85,7 @@ export async function redeemReward(deps: Deps, familyId: string, childId: string
     await lockChild(tx, childId)
     const available = (await starBalance(tx, childId)) - (await pendingCost(tx, childId))
     if (available < rw.costStars) {
-      throw new HttpError(409, { error: 'not_enough_stars', message: `Con cần ${rw.costStars} ⭐, hiện có ${available} ⭐` })
+      throw new HttpError(409, { error: 'not_enough_stars', message: `Quà này cần ${rw.costStars} ⭐, con đang có ${available} ⭐. Cố thêm chút nữa nhé!` })
     }
     const [r] = await tx.insert(rewardRedemption).values({ childId, rewardId, costStars: rw.costStars }).returning({ id: rewardRedemption.id })
     return r!.id

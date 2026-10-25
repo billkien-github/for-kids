@@ -17,12 +17,12 @@ export function NewWorksheetPage() {
   return (
     <main className="mx-auto max-w-4xl p-6">
       <div className="flex flex-wrap items-center gap-2">
-        <h1 className="text-2xl font-bold">Tạo bài</h1>
+        <h1 className="text-2xl font-bold">✨ Soạn bài mới</h1>
         <div className="ml-auto flex gap-2">
           {(
             [
-              ['form', 'Soạn'],
-              ['json', 'Dán JSON'],
+              ['form', '✏️ Soạn từng câu'],
+              ['json', '{ } Dán JSON'],
             ] as const
           ).map(([m, label]) => (
             <button key={m} type="button" onClick={() => setMode(m)} className={`min-h-touch rounded-xl px-4 ${mode === m ? 'bg-slate-800 text-white' : 'bg-white shadow-sm'}`}>
@@ -31,7 +31,7 @@ export function NewWorksheetPage() {
           ))}
         </div>
       </div>
-      <div className="mt-4">{mode === 'form' ? <WorksheetEditor initial={emptyDraft()} onSave={create} saveLabel="Tạo bài nháp" /> : <JsonCreate onCreate={create} />}</div>
+      <div className="mt-4">{mode === 'form' ? <WorksheetEditor initial={emptyDraft()} onSave={create} saveLabel="💾 Lưu bài (chưa mở cho con)" /> : <JsonCreate onCreate={create} />}</div>
     </main>
   )
 }
@@ -60,7 +60,7 @@ function JsonCreate({ onCreate }: { onCreate: (input: unknown) => Promise<void> 
       <p className="text-sm text-slate-500">Định dạng xem docs/spec.md §4; agent có thể gọi tool get_question_schema để lấy JSON Schema và ví dụ.</p>
       <textarea value={text} onChange={(e) => setText(e.target.value)} spellCheck={false} className="h-[60vh] rounded-xl border border-slate-300 p-3 font-mono text-sm" />
       {error && <p className="whitespace-pre-line text-red-600">{error}</p>}
-      <button className="min-h-touch self-end rounded-xl bg-slate-800 px-6 text-white">Tạo bài nháp</button>
+      <button className="min-h-touch self-end rounded-xl bg-slate-800 px-6 text-white">💾 Lưu bài (chưa mở cho con)</button>
     </form>
   )
 }

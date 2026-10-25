@@ -337,7 +337,7 @@ Hiện không còn vấn đề mở.
 | Nhiều câu trên một màn | Thêm `worksheet.layout = one_per_screen \| grid` (§3, §6). |
 | Ngôn ngữ môn Toán | Song ngữ Anh–Việt: `worksheet.lang` + `sub`. |
 
-## 14. Phụ lục: đối chiếu mẫu trong `docs/samples`
+## 14. Phụ lục: đối chiếu mẫu trong `docs/loaded`
 
 ### 14.1 Các nhóm mẫu
 | Nhóm | File | Nội dung |

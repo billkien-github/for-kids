@@ -186,7 +186,10 @@ export const StarThresholdsInput = z
     message: 'Ngưỡng phải tăng dần (1 sao < 2 sao < 3 sao)',
   })
 
-export type FamilySettings = { name: string; starThresholds: [number, number, number] }
+/** Số việc cần bố mẹ để ý, hiện thành chấm đếm trên menu. */
+export type ParentSummary = { pendingRedemptions: number; overdueAssignments: number; draftWorksheets: number }
+
+export type FamilySettings ={ name: string; starThresholds: [number, number, number] }
 
 export type McpAuditEntry = { id: string; tokenName: string; tool: string; argsSummary: unknown; ok: boolean; createdAt: string }
 

@@ -48,8 +48,8 @@ export function StarThresholdsSection() {
     save({ thresholds: value })
   }
   return (
-    <Section title="Ngưỡng sao">
-      <p className="mt-1 text-sm text-slate-500">% đúng tối thiểu để được 1, 2, 3 sao. Áp dụng cho các lần nộp sau.</p>
+    <Section title="Cách tính sao">
+      <p className="mt-1 text-sm text-slate-500">Con làm đúng bao nhiêu % thì được 1, 2, 3 sao. Áp dụng cho các bài nộp từ giờ.</p>
       <form onSubmit={submit} className="mt-3 flex flex-wrap items-end gap-3">
         {[0, 1, 2].map((i) => (
           <label key={i} className="flex flex-col text-sm">
@@ -69,7 +69,7 @@ export function StarThresholdsSection() {
           </label>
         ))}
         <button disabled={pending} className="min-h-touch rounded-xl bg-slate-800 px-5 text-white">
-          Lưu
+          Lưu lại
         </button>
       </form>
       {status}
@@ -86,7 +86,7 @@ export function PinSection() {
   })
   const digits = (v: string) => v.replace(/\D/g, '').slice(0, 4)
   return (
-    <Section title="PIN phụ huynh">
+    <Section title="Mã PIN của bố mẹ">
       <form
         onSubmit={(e) => {
           e.preventDefault()
@@ -95,15 +95,15 @@ export function PinSection() {
         className="mt-3 flex flex-wrap items-end gap-3"
       >
         <label className="flex flex-col text-sm">
-          PIN hiện tại
+          Mã PIN đang dùng
           <input type="password" inputMode="numeric" value={currentPin} onChange={(e) => setCurrent(digits(e.target.value))} className={`${inputClass} w-32`} />
         </label>
         <label className="flex flex-col text-sm">
-          PIN mới (4 số)
+          Mã PIN mới (4 số)
           <input type="password" inputMode="numeric" value={newPin} onChange={(e) => setNew(digits(e.target.value))} className={`${inputClass} w-32`} />
         </label>
         <button disabled={pending || currentPin.length !== 4 || newPin.length !== 4} className="min-h-touch rounded-xl bg-slate-800 px-5 text-white disabled:opacity-50">
-          Đổi PIN
+          Đổi mã PIN
         </button>
       </form>
       {status}
@@ -128,7 +128,7 @@ export function PasswordSection() {
         className="mt-3 flex flex-wrap items-end gap-3"
       >
         <label className="flex flex-col text-sm">
-          Mật khẩu hiện tại
+          Mật khẩu đang dùng
           <input type="password" autoComplete="current-password" value={currentPassword} onChange={(e) => setCurrent(e.target.value)} className={inputClass} />
         </label>
         <label className="flex flex-col text-sm">
@@ -161,9 +161,9 @@ export function VoiceSection() {
   }, [])
 
   return (
-    <Section title="Giọng đọc đề (trên thiết bị này)">
+    <Section title="Giọng đọc đề (riêng máy này)">
       <p className="mt-1 text-sm text-slate-500">
-        Dùng giọng có sẵn của trình duyệt. Trên iPad, tải thêm giọng chất lượng cao ở Cài đặt → Trợ năng → Nội dung được đọc → Giọng nói.
+        Chọn giọng đọc to đề bài cho con. Trên iPad có thể tải thêm giọng hay hơn ở Cài đặt → Trợ năng → Nội dung được đọc → Giọng nói.
       </p>
       <div className="mt-3 flex flex-col gap-3">
         {VOICE_LANGS.map(({ lang, label, sample }) => {
@@ -179,7 +179,7 @@ export function VoiceSection() {
                   onChange={(e) => setPreferredVoice(lang, e.target.value || null)}
                   className={`${inputClass} min-w-56`}
                 >
-                  <option value="">Tự chọn</option>
+                  <option value="">Để app tự chọn</option>
                   {voices.map((v) => (
                     <option key={v.name} value={v.name}>
                       {v.name} ({v.lang})
@@ -202,17 +202,17 @@ export function McpAuditSection() {
   const [open, setOpen] = useState(false)
   const audit = useQuery({ queryKey: ['parent', 'mcp-audit'], queryFn: () => api<McpAuditEntry[]>('/parent/mcp-audit'), enabled: open })
   return (
-    <Section title="Nhật ký gọi MCP">
+    <Section title="Trợ lý AI đã làm gì">
       <button type="button" onClick={() => setOpen(!open)} className="mt-2 min-h-touch rounded-xl bg-slate-100 px-4 text-sm">
-        {open ? 'Ẩn' : 'Xem 200 lần gọi gần nhất'}
+        {open ? 'Ẩn đi' : 'Xem 200 việc gần nhất'}
       </button>
       {open && (
         <table className="mt-3 w-full text-sm">
           <thead className="text-left text-slate-500">
             <tr>
               <th className="py-1">Thời gian</th>
-              <th>Token</th>
-              <th>Tool</th>
+              <th>Trợ lý</th>
+              <th>Việc</th>
               <th>Tham số</th>
               <th>Kết quả</th>
             </tr>

@@ -203,7 +203,7 @@ export async function startReview(deps: Deps, familyId: string, childId: string)
     .where(and(eq(reviewItem.childId, childId), eq(worksheet.familyId, familyId), lte(reviewItem.dueOn, today)))
     .orderBy(asc(reviewItem.dueOn), asc(reviewItem.box))
     .limit(REVIEW_SESSION_SIZE)
-  if (due.length === 0) throw new HttpError(409, { error: 'nothing_to_review', message: 'Hôm nay chưa có câu nào cần ôn' })
+  if (due.length === 0) throw new HttpError(409, { error: 'nothing_to_review', message: 'Hôm nay con không có câu nào cần ôn. Giỏi lắm! 🎉' })
 
   const snaps = await snapshotsFor(db, due)
   const id = await db.transaction(async (tx) => {

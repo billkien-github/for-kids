@@ -70,7 +70,7 @@ export function authRoutes(app: FastifyInstance, deps: Deps) {
       const key = `child:${c.id}`
       deps.limits.pin.hit(key)
       if (!pin || !(await verify(c.pinHash, pin))) {
-        throw new HttpError(401, { error: 'wrong_pin', message: 'PIN chưa đúng' })
+        throw new HttpError(401, { error: 'wrong_pin', message: 'Mã PIN chưa đúng, thử lại nhé' })
       }
       deps.limits.pin.reset(key)
     }
@@ -91,7 +91,7 @@ export function authRoutes(app: FastifyInstance, deps: Deps) {
 
     const [user] = await db.select().from(parentUser).where(eq(parentUser.id, auth.parentUserId))
     if (!user || !(await verify(user.parentPinHash, pin))) {
-      throw new HttpError(401, { error: 'wrong_pin', message: 'PIN chưa đúng' })
+      throw new HttpError(401, { error: 'wrong_pin', message: 'Mã PIN chưa đúng, thử lại nhé' })
     }
     deps.limits.pin.reset(key)
 

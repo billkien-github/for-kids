@@ -11,7 +11,7 @@ type Dialog = { kind: 'child'; child: Profile } | { kind: 'parent' } | null
 
 /**
  * Màn chọn profile kiểu Netflix (§6 bé, mục 1). Bé cũng dùng màn này nên không có nút đăng xuất;
- * đăng xuất nằm trong khu phụ huynh.
+ * đăng xuất nằm trong Góc bố mẹ → Cài đặt → Tài khoản.
  */
 export function ProfilesPage() {
   const navigate = useNavigate()
@@ -31,21 +31,27 @@ export function ProfilesPage() {
   }
 
   return (
-    <main className="flex min-h-dvh flex-col items-center gap-10 bg-amber-50 p-6 pt-16 text-kid">
-      <h1 className="text-4xl font-bold">Ai đang học nào? 👋</h1>
+    <main className="flex min-h-dvh flex-col items-center gap-10 bg-amber-50 p-6 text-kid">
+      {/* Góc trên bên phải: dễ tìm với bố mẹ, gọn để các con ít bấm nhầm (vẫn cần PIN). */}
+      <div className="flex w-full justify-end">
+        <button type="button" onClick={() => open({ kind: 'parent' })} className="flex min-h-touch items-center gap-2 rounded-full bg-white px-4 text-base text-slate-700 shadow-sm">
+          🔐 Góc bố mẹ
+        </button>
+      </div>
+      <h1 className="text-4xl font-bold">Hôm nay ai học nào? 👋</h1>
 
       {profiles.isPending ? (
         <p className="text-slate-500">Đang tải…</p>
       ) : profiles.error ? (
         <div className="flex flex-col items-center gap-3">
-          <p className="text-red-600">Không tải được danh sách: {errorMessage(profiles.error)}</p>
+          <p className="text-red-600">Chưa tải được danh sách: {errorMessage(profiles.error)}</p>
           <button type="button" onClick={() => profiles.refetch()} className="min-h-touch rounded-xl bg-white px-6 shadow">
-            Thử lại
+            🔄 Thử lại
           </button>
         </div>
       ) : profiles.data.length === 0 ? (
         <p className="max-w-md text-center text-slate-600">
-          Chưa có bé nào. Vào <b>Khu phụ huynh</b> → <b>Hồ sơ các bé</b> để thêm.
+          Chưa có ai. Bố mẹ vào <b>Góc bố mẹ</b> → <b>Cài đặt</b> → <b>Các con</b> để thêm nhé.
         </p>
       ) : (
         <ul className="flex flex-wrap justify-center gap-8">
@@ -66,24 +72,20 @@ export function ProfilesPage() {
       )}
       {!dialog && select.error && <p className="text-red-600">{select.error}</p>}
 
-      <button type="button" onClick={() => open({ kind: 'parent' })} className="mt-auto min-h-touch rounded-xl bg-slate-800 px-6 text-base text-white">
-        Khu phụ huynh
-      </button>
-
       {dialog && (
         <Modal onClose={() => setDialog(null)}>
           {dialog.kind === 'child' ? (
             <PinPad
               title={`${dialog.child.avatar} ${dialog.child.name}`}
-              subtitle="Nhập mã PIN của con"
+              subtitle="Con nhập mã PIN nhé"
               error={select.error}
               onSubmit={(pin) => select.submit(dialog.child, pin)}
               onCancel={() => setDialog(null)}
             />
           ) : (
             <PinPad
-              title="Khu phụ huynh"
-              subtitle="Nhập PIN phụ huynh"
+              title="🔐 Góc bố mẹ"
+              subtitle="Nhập mã PIN của bố mẹ"
               error={unlock.error}
               onSubmit={unlock.submit}
               onCancel={() => setDialog(null)}

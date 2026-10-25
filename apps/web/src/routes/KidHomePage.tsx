@@ -1,27 +1,43 @@
-import { gradeLabel, type AttemptView, type KidHome, type LibraryItem } from '@for-kids/shared'
-import { useQuery } from '@tanstack/react-query'
+import { gradeLabel, type AttemptView, type LibraryItem } from '@for-kids/shared'
 import { useState } from 'react'
-import { Link, Navigate, useNavigate } from 'react-router'
-import { api, errorMessage, post, useMe } from '../api'
+import { useNavigate, useSearchParams } from 'react-router'
+import { errorMessage, post } from '../api'
+import { useKidHome } from './kid/KidLayout'
 import { Stars } from './kid/ResultView'
 
 const SUBJECT_ICON: Record<string, string> = { math: '🔢', vi: '📖', en: '🔤' }
+const NO_TOPIC = 'Khác'
 
-const dueLabel = (iso: string) =>
-  new Date(iso).toLocaleString('vi-VN', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+const dueLabel = (iso: string) => new Date(iso).toLocaleString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
 
-/** Trang chủ của bé (§6 bé, mục 2): bài hôm nay, thư viện. */
+const greeting = () => {
+  const h = new Date().getHours()
+  return h < 11 ? 'Chào buổi sáng' : h < 14 ? 'Chào buổi trưa' : h < 18 ? 'Chào buổi chiều' : 'Chào buổi tối'
+}
+
+/** Trang Học của con (§6 bé, mục 2): bài bố mẹ giao, kho bài theo môn. */
 export function KidHomePage() {
-  const me = useMe()
   const navigate = useNavigate()
-  const home = useQuery({ queryKey: ['kid', 'home'], queryFn: () => api<KidHome>('/kid/home'), enabled: !!me.data?.activeChild })
-  const [allGrades, setAllGrades] = useState(false)
+  const home = useKidHome()
+  // Bộ lọc kho bài nằm trên URL: làm bài xong quay lại vẫn đúng tab.
+  const [params, setParams] = useSearchParams()
+  const setFilter = (patch: Record<string, string | null>) =>
+    setParams(
+      (p) => {
+        for (const [k, v] of Object.entries(patch)) {
+          if (v === null) p.delete(k)
+          else p.set(k, v)
+        }
+        return p
+      },
+      { replace: true },
+    )
+  const allGrades = params.get('grades') === 'all'
   const [error, setError] = useState<string | null>(null)
 
-  if (me.data && !me.data.activeChild) return <Navigate to="/" replace />
-  if (home.isPending) return <p className="p-8 text-center text-kid text-slate-500">Đang tải…</p>
+  if (home.isPending) return <p className="p-8 text-center text-slate-500">Đang tải…</p>
   if (home.error) return <p className="p-8 text-center text-red-600">{errorMessage(home.error)}</p>
-  const { child, stars, streak, reviewDue, today, library } = home.data
+  const { child, reviewDue, today, library } = home.data
 
   const go = async (start: () => Promise<AttemptView>) => {
     setError(null)
@@ -33,51 +49,48 @@ export function KidHomePage() {
     }
   }
   const open = (worksheetId: string, assignmentId?: string) => go(() => post<AttemptView>('/kid/attempts', { worksheetId, assignmentId }))
-  const startReview = () => go(() => post<AttemptView>('/kid/review'))
 
-  const shown = allGrades ? library : library.filter((w) => w.grade === child.grade)
-  const bySubject = new Map<string, LibraryItem[]>()
-  for (const w of shown) bySubject.set(w.subjectName, [...(bySubject.get(w.subjectName) ?? []), w])
+  // Xem lớp khác: hiện tab lớp, mặc định "Tất cả lớp".
+  const gradeCounts = new Map<number, number>()
+  for (const w of library) gradeCounts.set(w.grade, (gradeCounts.get(w.grade) ?? 0) + 1)
+  const grades = [...gradeCounts].sort(([a], [b]) => a - b)
+  const pickedGrade = params.get('grade') === null ? null : Number(params.get('grade'))
+  const grade = !allGrades ? child.grade : pickedGrade !== null && gradeCounts.has(pickedGrade) ? pickedGrade : null
+  const ofGrade = grade === null ? library : library.filter((w) => w.grade === grade)
+  const subjects = [...new Map(ofGrade.map((w) => [w.subjectCode, w.subjectName])).entries()]
+  const subject = subjects.some(([code]) => code === params.get('subject')) ? params.get('subject') : null
+  const ofSubject = ofGrade.filter((w) => !subject || w.subjectCode === subject)
+  const topicCounts = new Map<string, number>()
+  for (const w of ofSubject) topicCounts.set(w.topic ?? NO_TOPIC, (topicCounts.get(w.topic ?? NO_TOPIC) ?? 0) + 1)
+  const topic = topicCounts.has(params.get('topic') ?? '') ? params.get('topic') : null
+  const shown = ofSubject.filter((w) => !topic || (w.topic ?? NO_TOPIC) === topic)
 
   return (
-    <main className="min-h-dvh bg-sky-50 pb-10 text-kid">
-      <header className="flex items-center gap-4 bg-white px-6 py-4 shadow-sm">
-        <span className="text-5xl">{child.avatar}</span>
-        <div>
-          <p className="text-2xl font-bold">{child.name}</p>
-          <p className="text-base text-slate-500">{gradeLabel(child.grade)}</p>
-        </div>
-        <span className="ml-auto rounded-full bg-orange-100 px-4 py-2 text-xl font-bold" title="Số ngày học liên tiếp">
-          🔥 {streak}
-        </span>
-        <Link to="/kid/achievements" className="rounded-full bg-amber-100 px-4 py-2 text-xl font-bold" title="Thành tích và đổi quà">
-          ⭐ {stars}
-        </Link>
-        <Link to="/" className="flex min-h-touch items-center rounded-xl bg-slate-100 px-5 text-base">
-          Đổi bé
-        </Link>
-      </header>
-      {error && <p className="mx-6 mt-4 rounded-xl bg-red-50 p-3 text-red-700">{error}</p>}
+    <main className="mx-auto max-w-5xl px-4 sm:px-6">
+      <p className="pt-5 text-2xl font-bold">
+        {greeting()}, {child.name}! 👋
+      </p>
+      {error && <p className="mt-4 rounded-xl bg-red-50 p-3 text-red-700">{error}</p>}
 
-      <section className="flex flex-wrap gap-3 px-6 pt-6">
+      {reviewDue > 0 && (
         <button
           type="button"
-          disabled={reviewDue === 0}
-          onClick={startReview}
-          className="flex min-h-touch flex-1 items-center gap-3 rounded-3xl bg-violet-600 px-5 py-4 text-left font-semibold text-white shadow-sm active:scale-[0.98] disabled:bg-slate-300"
+          onClick={() => go(() => post<AttemptView>('/kid/review'))}
+          className="mt-4 flex w-full items-center gap-4 rounded-3xl bg-violet-600 p-5 text-left text-white shadow-sm active:scale-[0.98]"
         >
-          <span className="text-3xl">🔁</span>
-          {reviewDue > 0 ? `Ôn tập: ${reviewDue} câu` : 'Hôm nay không có câu cần ôn'}
+          <span className="text-4xl">🔁</span>
+          <span className="flex-1">
+            <span className="block text-xl font-bold">Ôn lại {reviewDue} câu con chưa đúng</span>
+            <span className="text-base text-violet-100">Làm xong được thêm 1 ⭐</span>
+          </span>
+          <span className="text-xl font-bold">Ôn ngay →</span>
         </button>
-        <Link to="/kid/achievements" className="flex min-h-touch items-center gap-3 rounded-3xl bg-white px-5 py-4 font-semibold shadow-sm">
-          <span className="text-3xl">🏆</span> Thành tích & quà
-        </Link>
-      </section>
+      )}
 
-      <section className="p-6">
-        <h2 className="text-2xl font-bold">📌 Bài hôm nay</h2>
+      <section className="mt-6">
+        <h2 className="text-2xl font-bold">📌 Bài bố mẹ giao</h2>
         {today.length === 0 ? (
-          <p className="mt-2 text-slate-500">Con làm hết bài được giao rồi! 🎉</p>
+          <p className="mt-2 text-slate-500">Con làm hết bài bố mẹ giao rồi! 🎉 Chọn thêm bài trong kho bên dưới nhé.</p>
         ) : (
           <ul className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
             {today.map((a) => (
@@ -85,21 +98,22 @@ export function KidHomePage() {
                 <button
                   type="button"
                   onClick={() => open(a.worksheet.id, a.id)}
-                  className={`flex w-full flex-col gap-1 rounded-3xl bg-white p-5 text-left shadow-sm active:scale-[0.98] ${a.overdue ? 'ring-2 ring-red-400' : ''}`}
+                  className={`flex w-full items-center gap-4 rounded-3xl bg-white p-5 text-left shadow-sm active:scale-[0.98] ${a.overdue ? 'ring-2 ring-red-400' : ''}`}
                 >
-                  <span className="text-xl font-semibold">
-                    {SUBJECT_ICON[a.worksheet.subjectCode] ?? '📝'} {a.worksheet.title}
-                  </span>
-                  <span className="text-base text-slate-500">
-                    {a.worksheet.questionCount} câu
-                    {a.worksheet.timeLimitSec ? ` · ⏱ ${Math.round(a.worksheet.timeLimitSec / 60)} phút` : ''}
-                  </span>
-                  {a.dueAt && (
-                    <span className={`text-base ${a.overdue ? 'font-semibold text-red-600' : 'text-slate-500'}`}>
-                      {a.overdue ? 'Quá hạn: ' : 'Hạn: '}
-                      {dueLabel(a.dueAt)}
+                  <span className="text-4xl">{SUBJECT_ICON[a.worksheet.subjectCode] ?? '📝'}</span>
+                  <span className="flex flex-1 flex-col gap-1">
+                    <span className="text-xl font-semibold">{a.worksheet.title}</span>
+                    <span className="text-base text-slate-500">
+                      {a.worksheet.questionCount} câu
+                      {a.worksheet.timeLimitSec ? ` · ⏱ ${Math.round(a.worksheet.timeLimitSec / 60)} phút` : ''}
                     </span>
-                  )}
+                    {a.dueAt && (
+                      <span className={`text-base ${a.overdue ? 'font-semibold text-red-600' : 'text-slate-500'}`}>
+                        {a.overdue ? '⏰ Trễ hạn rồi, làm ngay nhé!' : `Hạn: ${dueLabel(a.dueAt)}`}
+                      </span>
+                    )}
+                  </span>
+                  <span className="rounded-2xl bg-sky-600 px-4 py-2 font-bold text-white">Làm bài</span>
                 </button>
               </li>
             ))}
@@ -107,36 +121,115 @@ export function KidHomePage() {
         )}
       </section>
 
-      <section className="px-6">
-        <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold">📚 Thư viện</h2>
-          <label className="flex min-h-touch items-center gap-2 text-base text-slate-600">
-            <input type="checkbox" checked={allGrades} onChange={(e) => setAllGrades(e.target.checked)} className="size-5" />
-            Xem cả các lớp khác
+      <section className="mt-8">
+        <div className="flex flex-wrap items-center gap-x-4">
+          <h2 className="text-2xl font-bold">📚 Kho bài của con</h2>
+          <label className="ml-auto flex min-h-touch items-center gap-2 text-base text-slate-600">
+            <input
+              type="checkbox"
+              checked={allGrades}
+              onChange={(e) => setFilter(e.target.checked ? { grades: 'all' } : { grades: null, grade: null })}
+              className="size-5"
+            />
+            Xem bài của lớp khác
           </label>
         </div>
-        {bySubject.size === 0 && <p className="mt-2 text-slate-500">Chưa có bài nào.</p>}
-        {[...bySubject].map(([subject, items]) => (
-          <div key={subject} className="mt-4">
-            <h3 className="mb-2 text-lg font-semibold text-slate-600">{subject}</h3>
-            <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              {items.map((w) => (
-                <li key={w.id}>
-                  <button
-                    type="button"
-                    onClick={() => open(w.id)}
-                    className="flex h-full w-full flex-col gap-1 rounded-2xl bg-white p-4 text-left shadow-sm active:scale-[0.98]"
-                  >
-                    <span className="font-semibold">{w.title}</span>
-                    {w.topic && <span className="text-sm text-slate-500">{w.topic}</span>}
-                    <span className="mt-auto pt-2">{w.bestStars !== null ? <Stars count={w.bestStars} size="text-xl" /> : <span className="text-sm text-slate-400">Chưa làm</span>}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
+        {allGrades && grades.length > 1 && (
+          <TabBar>
+            <Tab active={grade === null} count={library.length} onClick={() => setFilter({ grade: null })}>
+              Tất cả lớp
+            </Tab>
+            {grades.map(([g, n]) => (
+              <Tab key={g} active={grade === g} count={n} onClick={() => setFilter({ grade: String(g) })}>
+                {gradeLabel(g)}
+                {g === child.grade ? ' ⭐' : ''}
+              </Tab>
+            ))}
+          </TabBar>
+        )}
+        {subjects.length > 1 && (
+          <TabBar>
+            <Tab active={!subject} onClick={() => setFilter({ subject: null, topic: null })}>
+              Tất cả môn
+            </Tab>
+            {subjects.map(([code, name]) => (
+              <Tab key={code} active={subject === code} onClick={() => setFilter({ subject: code, topic: null })}>
+                {SUBJECT_ICON[code] ?? '📝'} {name}
+              </Tab>
+            ))}
+          </TabBar>
+        )}
+        {topicCounts.size > 1 && (
+          <TabBar>
+            <Tab active={!topic} count={ofSubject.length} onClick={() => setFilter({ topic: null })}>
+              Tất cả
+            </Tab>
+            {[...topicCounts].map(([name, n]) => (
+              <Tab key={name} active={topic === name} count={n} onClick={() => setFilter({ topic: name })}>
+                {name}
+              </Tab>
+            ))}
+          </TabBar>
+        )}
+        {shown.length === 0 && <p className="mt-3 text-slate-500">Chưa có bài nào ở đây.</p>}
+        <ul className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+          {shown.map((w) => (
+            <LibraryCard key={w.id} w={w} onOpen={() => open(w.id)} />
+          ))}
+        </ul>
       </section>
     </main>
+  )
+}
+
+/** Hàng tab; nhiều chủ đề thì xuống dòng để bé thấy hết, không phải cuộn ngang. */
+function TabBar({ children }: { children: React.ReactNode }) {
+  return (
+    // pt + gap chừa chỗ cho badge số bài lòi ra góc trên phải mỗi tab.
+    <div role="tablist" className="mt-3 flex flex-wrap gap-x-4 gap-y-4 pt-2">
+      {children}
+    </div>
+  )
+}
+
+function Tab({ active, count, onClick, children }: { active: boolean; count?: number; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={active}
+      onClick={onClick}
+      className={`relative min-h-touch rounded-full px-5 text-base whitespace-nowrap ${active ? 'bg-sky-600 font-semibold text-white shadow-sm' : 'bg-white text-slate-700 shadow-sm ring-1 ring-slate-200'}`}
+    >
+      {children}
+      {count !== undefined && (
+        <span
+          className={`absolute -top-2 -right-2 flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-xs leading-none font-bold text-white ring-2 ring-white ${active ? 'bg-amber-500' : 'bg-slate-400'}`}
+        >
+          {count}
+        </span>
+      )}
+    </button>
+  )
+}
+
+function LibraryCard({ w, onOpen }: { w: LibraryItem; onOpen: () => void }) {
+  return (
+    <li>
+      <button type="button" onClick={onOpen} className="flex h-full w-full flex-col gap-1 rounded-2xl bg-white p-4 text-left shadow-sm active:scale-[0.98]">
+        <span className="font-semibold">{w.title}</span>
+        {w.topic && <span className="text-sm text-slate-500">{w.topic}</span>}
+        <span className="mt-auto pt-2">
+          {w.bestStars === null ? (
+            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-sm font-semibold text-amber-800">✨ Bài mới</span>
+          ) : (
+            <span className="flex flex-col">
+              <Stars count={w.bestStars} size="text-xl" />
+              {w.bestStars < 3 && <span className="text-xs text-slate-500">Làm lại lấy đủ 3 sao!</span>}
+            </span>
+          )}
+        </span>
+      </button>
+    </li>
   )
 }

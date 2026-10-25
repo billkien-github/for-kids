@@ -5,7 +5,9 @@ import { useNavigate, useParams } from 'react-router'
 import { api, errorMessage, post } from '../../api'
 import { Modal } from '../../components/Modal'
 import { draftFromDetail, WorksheetEditor } from '../../components/editor/WorksheetEditor'
+import { TYPE_LABEL } from '../../components/editor/BodyEditors'
 import { QuestionView } from '../../components/questions/QuestionView'
+import { WORKSHEET_STATUS } from '../../copy'
 
 type Tab = 'answers' | 'try' | 'edit' | 'json'
 
@@ -21,66 +23,87 @@ export function WorksheetDetailPage() {
 
   const action = useMutation({
     mutationFn: (path: 'publish' | 'unpublish' | 'archive') => post(`/parent/worksheets/${id}/${path}`),
-    onSuccess: () => {
+    onSuccess: (_, path) => {
       void queryClient.invalidateQueries({ queryKey: key })
       void queryClient.invalidateQueries({ queryKey: ['parent', 'worksheets'] })
+      // Vừa mở bài cho con thì hỏi luôn có giao cho con nào không.
+      if (path === 'publish') setAssigning(true)
     },
   })
 
   if (ws.isPending) return <p className="p-6 text-slate-500">Đang tải…</p>
   if (ws.error) return <p className="p-6 text-red-600">{errorMessage(ws.error)}</p>
   const w = ws.data
+  const status = WORKSHEET_STATUS[w.status]
 
   return (
     <main className="mx-auto max-w-4xl p-6">
-      <button type="button" onClick={() => navigate('/parent/worksheets')} className="min-h-touch text-slate-500">
-        ← Danh sách bài
+      <button type="button" onClick={() => navigate(`/parent/worksheets?status=${w.status}`)} className="min-h-touch text-slate-500">
+        ← Kho bài
       </button>
       <div className="mt-2 flex flex-wrap items-start gap-3">
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold">{w.title}</h1>
+        <div className="min-w-0 flex-1">
+          <span
+            className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+              w.status === 'published' ? 'bg-emerald-100 text-emerald-800' : w.status === 'draft' ? 'bg-amber-100 text-amber-800' : 'bg-slate-200 text-slate-600'
+            }`}
+            title={status.hint}
+          >
+            {status.label}
+          </span>
+          <h1 className="mt-1 text-2xl font-bold">{w.title}</h1>
           <p className="text-slate-500">
             {w.subjectName} · {gradeLabel(w.grade)}
-            {w.topic ? ` · ${w.topic}` : ''} · {w.questionCount} câu · đọc bằng {w.ttsLang}
+            {w.topic ? ` · ${w.topic}` : ''} · {w.questionCount} câu · đọc đề bằng {w.ttsLang.startsWith('en') ? 'tiếng Anh' : 'tiếng Việt'}
             {w.timeLimitSec ? ` · ⏱ ${Math.round(w.timeLimitSec / 60)} phút` : ''}
           </p>
           {w.description && <p className="mt-1">{w.description}</p>}
           {w.sourceNote && <p className="mt-1 text-sm text-slate-400">Nguồn: {w.sourceNote}</p>}
         </div>
         <div className="flex flex-wrap gap-2">
-          {w.status === 'published' ? (
+          {w.status === 'draft' && (
+            <button type="button" onClick={() => action.mutate('publish')} className="min-h-touch rounded-xl bg-emerald-600 px-4 font-semibold text-white">
+              ▶️ Mở cho con làm
+            </button>
+          )}
+          {w.status === 'published' && (
             <>
-              <button type="button" onClick={() => setAssigning(true)} className="min-h-touch rounded-xl bg-emerald-600 px-4 text-white">
-                Giao bài
+              <button type="button" onClick={() => setAssigning(true)} className="min-h-touch rounded-xl bg-emerald-600 px-4 font-semibold text-white">
+                📌 Giao cho con
               </button>
-              <button type="button" onClick={() => action.mutate('unpublish')} className="min-h-touch rounded-xl bg-white px-4 shadow-sm">
-                Về nháp
+              <button type="button" onClick={() => action.mutate('unpublish')} className="min-h-touch rounded-xl bg-white px-4 shadow-sm" title="Con sẽ không thấy bài này nữa">
+                Tạm ẩn
               </button>
             </>
-          ) : (
-            <button type="button" onClick={() => action.mutate('publish')} className="min-h-touch rounded-xl bg-emerald-600 px-4 text-white">
-              Xuất bản
+          )}
+          {w.status === 'archived' && (
+            <button type="button" onClick={() => action.mutate('unpublish')} className="min-h-touch rounded-xl bg-white px-4 shadow-sm">
+              ↩️ Lấy ra soạn tiếp
             </button>
           )}
           {w.status !== 'archived' && (
-            <button type="button" onClick={() => confirm('Lưu trữ bài này?') && action.mutate('archive')} className="min-h-touch rounded-xl px-4 text-red-600">
-              Lưu trữ
+            <button
+              type="button"
+              onClick={() => confirm('Cất bài này đi? Con sẽ không thấy bài nữa, kết quả cũ vẫn giữ.') && action.mutate('archive')}
+              className="min-h-touch rounded-xl px-4 text-slate-500"
+            >
+              Cất đi
             </button>
           )}
         </div>
       </div>
       {action.error && <p className="mt-2 text-red-600">{errorMessage(action.error)}</p>}
 
-      <div className="mt-6 flex gap-2">
+      <div className="mt-6 flex flex-wrap gap-1 rounded-xl bg-slate-200/60 p-1 sm:w-fit">
         {(
           [
-            ['answers', 'Đáp án'],
-            ['try', 'Thử làm như bé'],
-            ['edit', 'Sửa'],
-            ['json', 'JSON'],
+            ['answers', '👀 Xem đáp án'],
+            ['try', '🧒 Làm thử như con'],
+            ['edit', '✏️ Sửa bài'],
+            ['json', '{ } JSON'],
           ] as const
         ).map(([t, label]) => (
-          <button key={t} type="button" onClick={() => setTab(t)} className={`min-h-touch rounded-xl px-4 ${tab === t ? 'bg-slate-800 text-white' : 'bg-white shadow-sm'}`}>
+          <button key={t} type="button" onClick={() => setTab(t)} className={`min-h-11 rounded-lg px-4 text-sm font-medium ${tab === t ? 'bg-white shadow-sm' : 'text-slate-600'}`}>
             {label}
           </button>
         ))}
@@ -128,14 +151,14 @@ function QuestionCard({ index, question, lang, mode }: { index: number; question
     <li className="rounded-3xl bg-white p-5 shadow-sm">
       <p className="mb-3 flex justify-between text-base text-slate-400">
         <span>
-          Câu {index + 1} · {question.body.type}
+          Câu {index + 1} · {TYPE_LABEL[question.body.type]}
         </span>
         <span>{question.skillCodes.join(', ')}</span>
       </p>
       <QuestionView body={question.body} solution={showSolution ? question.body : undefined} response={response} onChange={setResponse} lang={lang} />
       {mode === 'try' && question.body.type !== 'info' && (
         <button type="button" onClick={() => setChecked(!checked)} className="mt-3 min-h-touch rounded-xl bg-slate-100 px-4 text-base">
-          {checked ? 'Làm lại' : 'Kiểm tra'}
+          {checked ? '🔁 Làm lại' : '✅ Xem đúng sai'}
         </button>
       )}
       {showSolution && question.explanation && <p className="mt-3 rounded-2xl bg-amber-50 p-3 text-lg">💡 {question.explanation}</p>}
@@ -171,7 +194,7 @@ function JsonEditor({ worksheet, onSaved }: { worksheet: WorksheetDetail; onSave
 
   return (
     <form onSubmit={save} className="mt-4 flex flex-col gap-3">
-      <p className="text-sm text-slate-500">Sửa rồi bấm Lưu. Định dạng câu hỏi xem docs/spec.md §4. Lịch sử làm bài cũ không bị ảnh hưởng.</p>
+      <p className="text-sm text-slate-500">Dành cho người rành kỹ thuật (định dạng ở docs/spec.md §4). Kết quả con đã làm không bị ảnh hưởng.</p>
       <textarea
         value={text}
         onChange={(e) => setText(e.target.value)}
@@ -180,7 +203,7 @@ function JsonEditor({ worksheet, onSaved }: { worksheet: WorksheetDetail; onSave
       />
       {error && <p className="whitespace-pre-line text-red-600">{error}</p>}
       {saved && <p className="text-emerald-700">Đã lưu.</p>}
-      <button className="min-h-touch self-end rounded-xl bg-slate-800 px-6 text-white">Lưu</button>
+      <button className="min-h-touch self-end rounded-xl bg-slate-800 px-6 text-white">Lưu lại</button>
     </form>
   )
 }
@@ -211,7 +234,7 @@ function AssignForm({ worksheetId, onDone }: { worksheetId: string; onDone: () =
       }}
       className="flex w-[min(26rem,80vw)] flex-col gap-4"
     >
-      <h2 className="text-xl font-bold">Giao bài</h2>
+      <h2 className="text-xl font-bold">📌 Giao cho con</h2>
       <div className="flex flex-col gap-2">
         {kids.data?.map((k) => (
           <label key={k.id} className="flex min-h-touch items-center gap-3 rounded-xl bg-slate-50 px-3">
@@ -231,12 +254,12 @@ function AssignForm({ worksheetId, onDone }: { worksheetId: string; onDone: () =
         ))}
       </div>
       <label className="flex flex-col gap-1">
-        Hạn nộp (không bắt buộc)
+        Hạn làm (không bắt buộc)
         <input type="datetime-local" value={due} onChange={(e) => setDue(e.target.value)} className="min-h-touch rounded-xl border border-slate-300 px-3" />
       </label>
       {assign.error && <p className="text-red-600">{errorMessage(assign.error)}</p>}
       <button disabled={selected.size === 0 || assign.isPending} className="min-h-touch rounded-xl bg-emerald-600 font-semibold text-white disabled:opacity-50">
-        Giao cho {selected.size} bé
+        {selected.size ? `Giao cho ${selected.size} con` : 'Chọn con để giao'}
       </button>
     </form>
   )
