@@ -188,14 +188,23 @@ function FillBlankEditor({ body, onChange }: EditorProps<'fill_blank'>) {
   )
 }
 
+const emptyChoice = (): Choice => ({ id: '', content: { text: '' } })
+
 function MatchingEditor({ body, onChange }: EditorProps<'matching'>) {
-  // Soạn theo hàng: trái[i] nối với phải[i]; bé thấy cột phải đã xáo.
-  const rows = body.left.map((l, i) => ({ l, r: body.right[i] ?? { id: `r${i + 1}`, content: { text: '' } } }))
-  const setRows = (next: { l: Choice; r: Choice }[]) => {
-    const left = next.map((x, i) => ({ ...x.l, id: `l${i + 1}` }))
-    const right = next.map((x, i) => ({ ...x.r, id: `r${i + 1}` }))
-    onChange({ ...body, left, right, pairs: left.map((l, i) => [l.id, right[i]!.id] as [string, string]) })
+  // Mỗi hàng là một cặp đúng theo `pairs` (không theo vị trí trong mảng); ô phải không thuộc cặp nào là ô gây nhiễu.
+  const pairOf = new Map(body.pairs)
+  const rightById = new Map(body.right.map((r) => [r.id, r]))
+  const rows = body.left.map((l) => ({ l, r: rightById.get(pairOf.get(l.id) ?? '') ?? emptyChoice() }))
+  const paired = new Set(body.pairs.map(([, r]) => r))
+  const extras = body.right.filter((r) => !paired.has(r.id))
+
+  const write = (nextRows: { l: Choice; r: Choice }[], nextExtras: Choice[]) => {
+    const left = nextRows.map((x, i) => ({ ...x.l, id: `l${i + 1}` }))
+    const right = [...nextRows.map((x, i) => ({ ...x.r, id: `r${i + 1}` })), ...nextExtras.map((x, i) => ({ ...x, id: `x${i + 1}` }))]
+    onChange({ ...body, left, right, pairs: left.map((l, i) => [l.id, `r${i + 1}`] as [string, string]) })
   }
+  const setRows = (next: { l: Choice; r: Choice }[]) => write(next, extras)
+
   return (
     <div className="flex flex-col gap-3">
       <RichTextEditor value={body.prompt} onChange={(prompt) => onChange({ ...body, prompt })} placeholder="Đề" />
@@ -210,12 +219,23 @@ function MatchingEditor({ body, onChange }: EditorProps<'matching'>) {
           </button>
         </div>
       ))}
-      <button
-        type="button"
-        onClick={() => setRows([...rows, { l: { id: '', content: { text: '' } }, r: { id: '', content: { text: '' } } }])}
-        className="min-h-11 self-start rounded-lg bg-slate-100 px-3 text-sm"
-      >
+      <button type="button" onClick={() => setRows([...rows, { l: emptyChoice(), r: emptyChoice() }])} className="min-h-11 self-start rounded-lg bg-slate-100 px-3 text-sm">
         + Cặp
+      </button>
+
+      <p className="text-sm text-slate-500">Ô bên phải gây nhiễu (không nối với ô nào, không bắt buộc):</p>
+      {extras.map((x, i) => (
+        <div key={x.id || i} className="flex items-start gap-2">
+          <div className="flex-1">
+            <RichTextEditor compact value={x.content} onChange={(content) => write(rows, extras.map((e, j) => (j === i ? { ...e, content } : e)))} />
+          </div>
+          <button type="button" onClick={() => write(rows, extras.filter((_, j) => j !== i))} className="mt-2 px-2 text-red-600">
+            ✕
+          </button>
+        </div>
+      ))}
+      <button type="button" onClick={() => write(rows, [...extras, emptyChoice()])} className="min-h-11 self-start rounded-lg bg-slate-100 px-3 text-sm">
+        + Ô gây nhiễu
       </button>
     </div>
   )

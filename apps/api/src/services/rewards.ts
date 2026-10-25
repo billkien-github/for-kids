@@ -4,7 +4,7 @@ import type { Db } from '../db/client.js'
 import { badge, child, childBadge, reward, rewardRedemption, starLedger } from '../db/schema.js'
 import type { Deps } from '../deps.js'
 import { HttpError } from '../http.js'
-import { starBalance, streakFor, type DbOrTx } from './progress.js'
+import { lockChild, starBalance, streakFor, type DbOrTx } from './progress.js'
 
 const toReward = (r: typeof reward.$inferSelect): RewardView => ({
   id: r.id,
@@ -82,7 +82,7 @@ export async function redeemReward(deps: Deps, familyId: string, childId: string
   if (!rw) throw new HttpError(404, { error: 'not_found' })
   return db.transaction(async (tx) => {
     // Khoá theo bé để hai lần bấm đổi cùng lúc không cùng lọt qua kiểm tra số dư.
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${childId}))`)
+    await lockChild(tx, childId)
     const available = (await starBalance(tx, childId)) - (await pendingCost(tx, childId))
     if (available < rw.costStars) {
       throw new HttpError(409, { error: 'not_enough_stars', message: `Con cần ${rw.costStars} ⭐, hiện có ${available} ⭐` })

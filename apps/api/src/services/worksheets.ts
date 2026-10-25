@@ -35,8 +35,25 @@ async function ensureTopic(db: DbOrTx, familyId: string, subjectId: string, name
   return t!.id
 }
 
-/** Ghi danh sách câu hỏi (đã validate) cho một bài. */
-async function insertQuestions(tx: Tx, familyId: string, worksheetId: string, questions: WorksheetInput['questions']) {
+/** JSON với khoá sắp xếp, để so sánh nội dung câu (jsonb của Postgres đổi thứ tự khoá). */
+function canonical(v: unknown): string {
+  if (Array.isArray(v)) return `[${v.map(canonical).join(',')}]`
+  if (v && typeof v === 'object') {
+    return `{${Object.keys(v)
+      .sort()
+      .filter((k) => (v as Record<string, unknown>)[k] !== undefined)
+      .map((k) => `${JSON.stringify(k)}:${canonical((v as Record<string, unknown>)[k])}`)
+      .join(',')}}`
+  }
+  return JSON.stringify(v)
+}
+
+/**
+ * Ghi danh sách câu hỏi (đã validate) cho một bài. Khi sửa bài, câu có nội dung không đổi được giữ
+ * nguyên id (chỉ cập nhật thứ tự, lời giải, điểm, kỹ năng), để hàng đợi ôn và lịch sử của bé không bị mất;
+ * chỉ câu bị bỏ mới bị xoá.
+ */
+async function writeQuestions(tx: Tx, familyId: string, worksheetId: string, questions: WorksheetInput['questions']) {
   const codes = [...new Set(questions.flatMap((q) => q.skillCodes ?? []))]
   const skillRows = codes.length
     ? await tx
@@ -51,22 +68,39 @@ async function insertQuestions(tx: Tx, familyId: string, worksheetId: string, qu
     }
   }
 
-  for (const [i, q] of questions.entries()) {
-    const [row] = await tx
-      .insert(question)
-      .values({
-        worksheetId,
-        sortOrder: i,
-        type: q.body.type,
-        body: q.body,
-        explanation: q.explanation ?? null,
-        points: q.body.type === 'info' ? 0 : (q.points ?? 1),
-        ttsLang: q.ttsLang ?? null,
-      })
-      .returning({ id: question.id })
-    const ids = [...new Set(q.skillCodes ?? [])].map((c) => skillId.get(c)!)
-    if (ids.length) await tx.insert(questionSkill).values(ids.map((sid) => ({ questionId: row!.id, skillId: sid })))
+  const existing = await tx.select({ id: question.id, body: question.body }).from(question).where(eq(question.worksheetId, worksheetId))
+  const unmatched = new Map<string, string[]>()
+  for (const e of existing) {
+    const key = canonical(e.body)
+    unmatched.set(key, [...(unmatched.get(key) ?? []), e.id])
   }
+
+  for (const [i, q] of questions.entries()) {
+    const fields = {
+      sortOrder: i,
+      explanation: q.explanation ?? null,
+      points: q.body.type === 'info' ? 0 : (q.points ?? 1),
+      ttsLang: q.ttsLang ?? null,
+    }
+    const reuse = unmatched.get(canonical(q.body))?.shift()
+    let id: string
+    if (reuse) {
+      id = reuse
+      await tx.update(question).set(fields).where(eq(question.id, id))
+      await tx.delete(questionSkill).where(eq(questionSkill.questionId, id))
+    } else {
+      const [row] = await tx
+        .insert(question)
+        .values({ worksheetId, type: q.body.type, body: q.body, ...fields })
+        .returning({ id: question.id })
+      id = row!.id
+    }
+    const ids = [...new Set(q.skillCodes ?? [])].map((c) => skillId.get(c)!)
+    if (ids.length) await tx.insert(questionSkill).values(ids.map((sid) => ({ questionId: id, skillId: sid })))
+  }
+
+  const removed = [...unmatched.values()].flat()
+  if (removed.length) await tx.delete(question).where(inArray(question.id, removed))
 }
 
 export async function createWorksheet(
@@ -99,7 +133,7 @@ export async function createWorksheet(
         createdByTokenId,
       })
       .returning({ id: worksheet.id })
-    await insertQuestions(tx, familyId, w!.id, input.questions)
+    await writeQuestions(tx, familyId, w!.id, input.questions)
     return w!.id
   })
 }
@@ -159,8 +193,7 @@ export async function updateWorksheet(db: Db, familyId: string, id: string, patc
       })
       .where(eq(worksheet.id, id))
     if (patch.questions) {
-      await tx.delete(question).where(eq(question.worksheetId, id))
-      await insertQuestions(tx, familyId, id, input.questions)
+      await writeQuestions(tx, familyId, id, input.questions)
     }
   })
 }

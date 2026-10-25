@@ -1,4 +1,4 @@
-import { addDays, localDate, TIMEZONE, type ChildReport, type Mistake, type Profile, type SkillLevel } from '@for-kids/shared'
+import { addDays, type ChildReport, type Mistake, type Profile, type SkillLevel } from '@for-kids/shared'
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link } from 'react-router'
@@ -51,10 +51,9 @@ export function OverviewPage() {
   }
   const r = report.data
 
-  // 14 ngày gần nhất, kể cả ngày không học (cột 0).
-  const today = localDate(new Date(), TIMEZONE)
-  const daily = Array.from({ length: 14 }, (_, i) => {
-    const date = addDays(today, i - 13)
+  // 14 ngày gần nhất theo múi giờ của gia đình (server tính), kể cả ngày không học (cột 0).
+  const daily = Array.from({ length: r ? 14 : 0 }, (_, i) => {
+    const date = addDays(r!.today, i - 13)
     const d = r?.daily.find((x) => x.date === date)
     return { label: dm(date), value: d?.minutes ?? 0, detail: d ? `${d.attempts} lần nộp` : 'không học' }
   })

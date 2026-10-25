@@ -119,6 +119,14 @@ describe('MCP', () => {
     expect(audit[0]!.ok).toBe(false)
   })
 
+  it('get_child_report báo lỗi rõ ràng khi ngày sai định dạng', async () => {
+    const r = await callTool(token, 'get_child_report', { childId: kid.id, from: 'last month' })
+    expect(r.isError).toBe(true)
+    expect(r.text).toMatch(/from/)
+    const okReport = await callTool(token, 'get_child_report', { childId: kid.id, from: '2026-09-01T00:00:00+07:00' })
+    expect(okReport.isError, okReport.text).toBe(false)
+  })
+
   it('create_worksheet báo lỗi kèm đường dẫn trường sai', async () => {
     const bad = structuredClone(WORKSHEET)
     ;(bad.questions[1]!.body as { blanks: { accept: string[] }[] }).blanks[0]!.accept = []

@@ -147,6 +147,8 @@ export type SkillProgress = {
 export type ChildReport = {
   child: { id: string; name: string; avatar: string; grade: number }
   range: { from: string; to: string }
+  /** "YYYY-MM-DD" hôm nay theo múi giờ của gia đình, để vẽ biểu đồ theo ngày khớp với server. */
+  today: string
   streak: number
   stars: number
   /** Điểm trung bình lần chính thức (attempt_no = 1) theo môn. */

@@ -8,7 +8,7 @@ import type { Deps } from '../deps.js'
 import { idParam, parse } from '../http.js'
 import { listAssignments } from '../services/assignments.js'
 import { bestByWorksheet, getAttemptView, saveAnswers, startAttempt, startReview, submitAttempt } from '../services/attempts.js'
-import { reviewDueCount, starBalance, streakFor } from '../services/progress.js'
+import { familyTimezone, reviewDueCount, starBalance, streakFor } from '../services/progress.js'
 import { achievements, redeemReward } from '../services/rewards.js'
 
 /** API của bé (§7): mọi thứ giới hạn trong bé đang được chọn. */
@@ -40,18 +40,26 @@ export function kidRoutes(app: FastifyInstance, deps: Deps) {
       .leftJoin(topic, eq(topic.id, worksheet.topicId))
       .where(and(eq(worksheet.familyId, familyId), eq(worksheet.status, 'published')))
       .orderBy(desc(worksheet.publishedAt))
-    const best = await bestByWorksheet(
-      deps,
-      childId,
-      published.map((w) => w.id),
-    )
+    const now = deps.clock()
+    const tz = await familyTimezone(db, childId)
+    const [best, stars, streak, reviewDue, today] = await Promise.all([
+      bestByWorksheet(
+        deps,
+        childId,
+        published.map((w) => w.id),
+      ),
+      starBalance(db, childId),
+      streakFor(db, childId, now, tz),
+      reviewDueCount(db, childId, now, tz),
+      listAssignments(db, familyId, { childId, pendingOnly: true, now }),
+    ])
 
     return {
       child: { id: c.id, name: c.name, avatar: c.avatar, grade: c.grade },
-      stars: await starBalance(db, childId),
-      streak: await streakFor(db, childId, deps.clock()),
-      reviewDue: await reviewDueCount(db, childId, deps.clock()),
-      today: await listAssignments(db, familyId, { childId, pendingOnly: true, now: deps.clock() }),
+      stars,
+      streak,
+      reviewDue,
+      today,
       library: published.map(
         (w): LibraryItem => ({
           ...w,

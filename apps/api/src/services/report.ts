@@ -92,7 +92,8 @@ export async function childReport(deps: Deps, familyId: string, childId: string,
   return {
     child: { id: c.id, name: c.name, avatar: c.avatar, grade: c.grade },
     range: { from: from.toISOString(), to: to.toISOString() },
-    streak: await streakFor(db, childId, now),
+    today: localDate(now, tz),
+    streak: await streakFor(db, childId, now, tz),
     stars: await starBalance(db, childId),
     subjects: [...subjects].map(([subjectCode, s]) => ({ subjectCode, subjectName: s.subjectName, avgScorePct: avg(s.scores), worksheets: s.scores.length })),
     weekly: [...weeks].sort(([a], [b]) => a.localeCompare(b)).map(([weekStart, scores]) => ({ weekStart, avgScorePct: avg(scores), attempts: scores.length })),
@@ -102,7 +103,7 @@ export async function childReport(deps: Deps, familyId: string, childId: string,
     overdue: assignments.filter((a) => a.overdue),
     pending: assignments.filter((a) => !a.overdue),
     recent: (await listChildAttempts(deps, familyId, childId, 10)).filter((a) => a.submittedAt),
-    reviewDue: await reviewDueCount(db, childId, now),
+    reviewDue: await reviewDueCount(db, childId, now, tz),
   }
 }
 

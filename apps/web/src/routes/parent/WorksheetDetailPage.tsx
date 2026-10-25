@@ -93,7 +93,10 @@ export function WorksheetDetailPage() {
             initial={draftFromDetail(w)}
             saveLabel="Lưu thay đổi"
             onSave={async (draft) => {
-              await api(`/parent/worksheets/${w.id}`, { method: 'PUT', body: draft })
+              // Không đổi câu nào thì không gửi questions, để server không đụng tới câu hỏi
+              // (hàng đợi ôn và lịch sử của bé gắn với từng câu).
+              const changed = JSON.stringify(draft.questions) !== JSON.stringify(draftFromDetail(w).questions)
+              await api(`/parent/worksheets/${w.id}`, { method: 'PUT', body: changed ? draft : { ...draft, questions: undefined } })
               await queryClient.invalidateQueries({ queryKey: key })
             }}
           />

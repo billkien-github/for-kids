@@ -105,6 +105,36 @@ describe('ôn câu sai (Leitner)', () => {
     expect((await ok<KidHome>({ method: 'GET', url: '/api/kid/home' })).reviewDue).toBe(2)
   })
 
+  it('sửa bài không làm mất hàng đợi ôn của câu không đổi', async () => {
+    await doWorksheet([1, 3])
+    t.clock.advance(DAY)
+    expect((await ok<KidHome>({ method: 'GET', url: '/api/kid/home' })).reviewDue).toBe(2)
+
+    await unlock()
+    // Đổi tiêu đề, đảo thứ tự câu, thay câu 3 (không sai) bằng câu mới: 2 câu sai vẫn còn trong hàng đợi.
+    const [q0, q1, , q3] = WORKSHEET.questions
+    const newQ = { body: { type: 'true_false', prompt: { text: '2 + 2 = 4' }, answer: true } }
+    await ok({ method: 'PUT', url: `/api/parent/worksheets/${worksheetId}`, payload: { title: 'Đã sửa', questions: [q3, q1, q0, newQ] } })
+    await selectKid()
+    expect((await ok<KidHome>({ method: 'GET', url: '/api/kid/home' })).reviewDue).toBe(2)
+
+    // Bỏ hẳn một câu sai thì câu đó ra khỏi hàng đợi.
+    await unlock()
+    await ok({ method: 'PUT', url: `/api/parent/worksheets/${worksheetId}`, payload: { questions: [q0, q1, newQ] } })
+    await selectKid()
+    expect((await ok<KidHome>({ method: 'GET', url: '/api/kid/home' })).reviewDue).toBe(1)
+  })
+
+  it('bấm "Ôn tập" hai lần cùng lúc chỉ tạo một phiên', async () => {
+    await doWorksheet([1, 3])
+    t.clock.advance(DAY)
+    const [a, b] = await Promise.all([
+      ok<AttemptView>({ method: 'POST', url: '/api/kid/review' }),
+      ok<AttemptView>({ method: 'POST', url: '/api/kid/review' }),
+    ])
+    expect(a.id).toBe(b.id)
+  })
+
   it('làm lại bài mà vẫn sai thì câu đó về hộp 1', async () => {
     await doWorksheet([0])
     t.clock.advance(DAY)
@@ -185,6 +215,30 @@ describe('quà và huy hiệu', () => {
     ach = await ok<Achievements>({ method: 'GET', url: '/api/kid/achievements' })
     expect(ach).toMatchObject({ stars: 2, available: 2 })
     expect(ach.redemptions[0]!.status).toBe('approved')
+  })
+
+  it('bài chỉ có thẻ bài học: không có sao, không tính điểm tuyệt đối', async () => {
+    await unlock()
+    const info = (
+      await ok<{ id: string }>(
+        { method: 'POST', url: '/api/parent/worksheets', payload: { subjectCode: 'math', grade: 1, title: 'Số 2', questions: [{ body: { type: 'info', prompt: { text: 'Two' } } }] } },
+        201,
+      )
+    ).id
+    await ok({ method: 'POST', url: `/api/parent/worksheets/${info}/publish` })
+    await selectKid()
+    const view = await ok<AttemptView>({ method: 'POST', url: '/api/kid/attempts', payload: { worksheetId: info } })
+    const done = await ok<AttemptView>({ method: 'POST', url: `/api/kid/attempts/${view.id}/submit` })
+    expect(done.result!.stars).toBe(0)
+    expect(done.result!.newBadges.map((b) => b.code)).toEqual(['first_worksheet'])
+  })
+
+  it('mở cùng một bài hai lần cùng lúc chỉ tạo một lần làm', async () => {
+    const [a, b] = await Promise.all([
+      ok<AttemptView>({ method: 'POST', url: '/api/kid/attempts', payload: { worksheetId } }),
+      ok<AttemptView>({ method: 'POST', url: '/api/kid/attempts', payload: { worksheetId } }),
+    ])
+    expect(a.id).toBe(b.id)
   })
 
   it('đổi quà song song không vượt số dư', async () => {

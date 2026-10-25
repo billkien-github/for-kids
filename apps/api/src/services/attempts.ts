@@ -28,7 +28,7 @@ import {
 } from '../db/schema.js'
 import type { Deps } from '../deps.js'
 import { HttpError } from '../http.js'
-import { applyProgress, awardBadges, badgesFromAttempt, familyTimezone, type DbOrTx } from './progress.js'
+import { applyProgress, awardBadges, badgesFromAttempt, familyTimezone, lockChild, type DbOrTx } from './progress.js'
 
 /** Bản chụp câu hỏi lúc bắt đầu làm (§3): sửa bài sau đó không làm sai lịch sử. */
 export type QuestionSnapshot = {
@@ -144,6 +144,14 @@ export async function startAttempt(
 
   const now = deps.clock()
   const id = await db.transaction(async (tx) => {
+    // Bấm mở bài hai lần cùng lúc: lần sau thấy lần làm vừa tạo và dùng lại.
+    await lockChild(tx, childId)
+    const [raced] = await tx
+      .select({ id: attempt.id })
+      .from(attempt)
+      .where(and(eq(attempt.childId, childId), eq(attempt.worksheetId, w.id), eq(attempt.kind, 'normal'), isNull(attempt.submittedAt)))
+    if (raced) return raced.id
+
     const [{ last }] = (await tx
       .select({ last: max(attempt.attemptNo) })
       .from(attempt)
@@ -199,6 +207,14 @@ export async function startReview(deps: Deps, familyId: string, childId: string)
 
   const snaps = await snapshotsFor(db, due)
   const id = await db.transaction(async (tx) => {
+    // Bấm "Ôn tập" hai lần cùng lúc chỉ tạo một phiên.
+    await lockChild(tx, childId)
+    const [raced] = await tx
+      .select({ id: attempt.id })
+      .from(attempt)
+      .where(and(eq(attempt.childId, childId), eq(attempt.kind, 'review'), isNull(attempt.submittedAt)))
+    if (raced) return raced.id
+
     const [{ n }] = (await tx
       .select({ n: count() })
       .from(attempt)
@@ -239,6 +255,8 @@ async function finalizeAttempt(deps: Deps, attemptId: string, auto: boolean) {
   await deps.db.transaction(async (tx) => {
     const [a] = await tx.select().from(attempt).where(eq(attempt.id, attemptId))
     if (!a) return
+    // Các lần nộp của cùng một bé chạy lần lượt: tiến độ, hộp ôn, huy hiệu không bị ghi chồng.
+    await lockChild(tx, a.childId)
     const submittedAt = auto && a.deadlineAt ? a.deadlineAt : now
     const claimed = await tx
       .update(attempt)
@@ -269,7 +287,8 @@ async function finalizeAttempt(deps: Deps, attemptId: string, auto: boolean) {
       .from(family)
       .innerJoin(child, eq(child.familyId, family.id))
       .where(eq(child.id, a.childId))
-    const stars = starsFor(pct, fam?.thresholds ?? [50, 75, 90])
+    // Bài không có câu nào để chấm (chỉ thẻ bài học) thì không có sao.
+    const stars = total > 0 ? starsFor(pct, fam?.thresholds ?? [50, 75, 90]) : 0
 
     await tx
       .update(attempt)

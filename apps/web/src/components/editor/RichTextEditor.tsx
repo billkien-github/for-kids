@@ -1,5 +1,5 @@
 import type { RichText } from '@for-kids/shared'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { ApiError, errorMessage } from '../../api'
 import { angleForTime, Clock } from '../Clock'
 
@@ -32,8 +32,11 @@ export function RichTextEditor({ value, onChange, placeholder, compact, hint }: 
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [more, setMore] = useState(!!(value.sub || value.ttsText))
+  // Giá trị mới nhất: tải ảnh xong (bất đồng bộ) không được ghi đè chữ vừa gõ trong lúc chờ.
+  const latest = useRef(value)
+  latest.current = value
   const set = (patch: Partial<RichText>) => {
-    const next = { ...value, ...patch }
+    const next = { ...latest.current, ...patch }
     for (const k of Object.keys(next) as (keyof RichText)[]) if (next[k] === undefined || next[k] === '') delete next[k]
     onChange(next)
   }

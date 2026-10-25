@@ -206,7 +206,11 @@ export function buildMcpServer(deps: Deps, auth: TokenAuth) {
     'get_child_report',
     'results:read',
     'Báo cáo của một bé: điểm trung bình lần chính thức theo môn/tuần, mức thành thạo từng kỹ năng (kỹ năng yếu), streak, bài quá hạn, số câu đến hạn ôn.',
-    { childId: z.uuid(), from: z.string().optional().describe('ISO 8601, mặc định 8 tuần trước'), to: z.string().optional() },
+    {
+      childId: z.uuid(),
+      from: z.iso.datetime({ offset: true }).optional().describe('ISO 8601 có múi giờ, vd. 2026-09-01T00:00:00+07:00; mặc định 8 tuần trước'),
+      to: z.iso.datetime({ offset: true }).optional(),
+    },
     (a) => childReport(deps, familyId, a.childId, { from: a.from ? new Date(a.from) : undefined, to: a.to ? new Date(a.to) : undefined }),
   )
 

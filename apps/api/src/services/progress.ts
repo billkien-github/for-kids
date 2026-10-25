@@ -7,12 +7,20 @@ import {
   nextMastery,
   nextReview,
 } from '@for-kids/shared'
-import { and, count, eq, gte, isNotNull, lte, notInArray, sql } from 'drizzle-orm'
+import { and, count, eq, gt, gte, isNotNull, lte, notInArray, sql } from 'drizzle-orm'
 import type { Db } from '../db/client.js'
 import { attempt, attemptAnswer, badge, child, childBadge, family, question, reviewItem, skillMastery, starLedger } from '../db/schema.js'
 
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0]
 export type DbOrTx = Db | Tx
+
+/**
+ * Khoá theo từng bé đến hết transaction: các thao tác ghi tiến độ / tạo lần làm / đổi quà của cùng
+ * một bé chạy lần lượt (bấm hai lần, nộp trên hai máy cùng lúc…).
+ */
+export async function lockChild(tx: DbOrTx, childId: string) {
+  await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${childId}))`)
+}
 
 export async function familyTimezone(db: DbOrTx, childId: string): Promise<string> {
   const [f] = await db.select({ tz: family.timezone }).from(family).innerJoin(child, eq(child.familyId, family.id)).where(eq(child.id, childId))
@@ -93,15 +101,16 @@ export async function studyDays(db: DbOrTx, childId: string, tz: string, since: 
   return [...new Set(rows.map((r) => localDate(r.submittedAt!, tz)))]
 }
 
-export async function streakFor(db: DbOrTx, childId: string, now: Date): Promise<number> {
-  const tz = await familyTimezone(db, childId)
+/** `tz` có thể truyền sẵn để khỏi tra lại múi giờ của gia đình. */
+export async function streakFor(db: DbOrTx, childId: string, now: Date, tz?: string): Promise<number> {
+  const zone = tz ?? (await familyTimezone(db, childId))
   // Đủ dài cho chuỗi một năm; chuỗi dài hơn vẫn đúng tới mốc này.
-  const days = await studyDays(db, childId, tz, new Date(now.getTime() - 400 * 24 * 3600 * 1000))
-  return computeStreak(days, localDate(now, tz))
+  const days = await studyDays(db, childId, zone, new Date(now.getTime() - 400 * 24 * 3600 * 1000))
+  return computeStreak(days, localDate(now, zone))
 }
 
-export async function reviewDueCount(db: DbOrTx, childId: string, now: Date): Promise<number> {
-  const today = localDate(now, await familyTimezone(db, childId))
+export async function reviewDueCount(db: DbOrTx, childId: string, now: Date, tz?: string): Promise<number> {
+  const today = localDate(now, tz ?? (await familyTimezone(db, childId)))
   const [r] = await db
     .select({ n: count() })
     .from(reviewItem)
@@ -153,7 +162,8 @@ export async function awardBadges(tx: DbOrTx, childId: string, attemptId: string
             tx
               .select({ n: count() })
               .from(attempt)
-              .where(and(eq(attempt.childId, childId), eq(attempt.kind, 'normal'), gte(attempt.scorePct, 100))),
+              // Bài không có câu nào để chấm (chỉ thẻ bài học) không tính là điểm tuyệt đối.
+              .where(and(eq(attempt.childId, childId), eq(attempt.kind, 'normal'), gte(attempt.scorePct, 100), gt(attempt.totalPoints, 0))),
           ),
         )
       case 'streak':
@@ -192,13 +202,21 @@ export async function awardBadges(tx: DbOrTx, childId: string, attemptId: string
     const rule = b.rule as BadgeRule
     if ((await value(rule)) >= threshold(rule)) won.push(b)
   }
+  const awarded: typeof won = []
   for (const b of won) {
-    await tx.insert(childBadge).values({ childId, badgeId: b.id, earnedAt: at, attemptId }).onConflictDoNothing()
+    const inserted = await tx
+      .insert(childBadge)
+      .values({ childId, badgeId: b.id, earnedAt: at, attemptId })
+      .onConflictDoNothing()
+      .returning({ badgeId: childBadge.badgeId })
+    // Chỉ thưởng sao khi huy hiệu thật sự vừa được thêm.
+    if (inserted.length === 0) continue
+    awarded.push(b)
     if (b.bonusStars > 0) {
       await tx.insert(starLedger).values({ childId, delta: b.bonusStars, reason: 'badge', refId: attemptId, note: `${b.icon} ${b.name}` })
     }
   }
-  return won.map((b) => ({ code: b.code, name: b.name, icon: b.icon }))
+  return awarded.map((b) => ({ code: b.code, name: b.name, icon: b.icon }))
 }
 
 /** Huy hiệu bé đạt được nhờ lần làm bài này. */
