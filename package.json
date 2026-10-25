@@ -1,0 +1,17 @@
+{
+  "name": "for-kids",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "pnpm --parallel --filter @for-kids/api --filter @for-kids/web dev",
+    "build": "pnpm --filter @for-kids/web build && pnpm --filter @for-kids/api build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "db:generate": "pnpm --filter @for-kids/api db:generate",
+    "db:migrate": "pnpm --filter @for-kids/api db:migrate",
+    "db:seed": "pnpm --filter @for-kids/api db:seed"
+  }
+}
