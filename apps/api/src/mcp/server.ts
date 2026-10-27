@@ -199,7 +199,7 @@ export function buildMcpServer(deps: Deps, auth: TokenAuth) {
     'assign',
     'Giao bài đã xuất bản cho các bé, có thể kèm hạn nộp (ISO 8601 có múi giờ, vd. 2026-11-01T20:00:00+07:00).',
     { worksheetId: z.uuid(), childIds: z.array(z.uuid()).min(1), dueAt: z.string().optional() },
-    async (a) => ({ ids: await assignWorksheet(db, familyId, AssignInput.parse(a), 'token') }),
+    async (a) => ({ ids: await assignWorksheet(db, familyId, AssignInput.parse(a), 'token', deps.clock()) }),
   )
 
   tool(

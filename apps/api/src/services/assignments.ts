@@ -1,10 +1,12 @@
 import type { AssignInput, AssignmentView } from '@for-kids/shared'
 import { and, asc, eq, inArray, isNotNull, isNull, sql, type SQL } from 'drizzle-orm'
 import type { Db } from '../db/client.js'
-import { assignment, attempt, child, question, subject, worksheet } from '../db/schema.js'
+import { assignment, attempt, child, subject, worksheet } from '../db/schema.js'
 import { HttpError } from '../http.js'
+import { questionCount } from './worksheets.js'
 
-export async function assignWorksheet(db: Db, familyId: string, input: AssignInput, by: 'parent' | 'token') {
+/** `now` lấy từ đồng hồ của app (deps.clock), cùng nguồn với giờ nộp bài khi so "đã làm sau khi giao chưa". */
+export async function assignWorksheet(db: Db, familyId: string, input: AssignInput, by: 'parent' | 'token', now: Date) {
   const [w] = await db
     .select({ status: worksheet.status })
     .from(worksheet)
@@ -27,6 +29,7 @@ export async function assignWorksheet(db: Db, familyId: string, input: AssignInp
         childId,
         assignedBy: by,
         dueAt: input.dueAt ? new Date(input.dueAt) : null,
+        createdAt: now,
       })),
     )
     .returning({ id: assignment.id })
@@ -69,7 +72,7 @@ export async function listAssignments(
       timeLimitSec: worksheet.timeLimitSec,
       subjectCode: subject.code,
       subjectName: subject.name,
-      questionCount: sql<number>`(select count(*)::int from ${question} where ${question.worksheetId} = ${worksheet.id})`,
+      questionCount,
     })
     .from(assignment)
     .innerJoin(child, eq(child.id, assignment.childId))

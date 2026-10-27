@@ -89,6 +89,57 @@ export const QUESTION_EXAMPLES: Record<string, QuestionInput> = {
   info: {
     body: { type: 'info', prompt: { text: 'Số 2 — Two', imageAssetId: '00000000-0000-0000-0000-000000000000' } },
   },
+  // Toạ độ theo pixel của ảnh đã upload (width/height là kích thước ảnh đó).
+  hotspot: {
+    body: {
+      type: 'hotspot',
+      prompt: { text: 'Tìm và chạm vào tất cả các số 1' },
+      image: '00000000-0000-0000-0000-000000000000',
+      width: 800,
+      height: 1000,
+      targets: [
+        { x: 40, y: 60, w: 120, h: 260 },
+        { x: 610, y: 420, w: 90, h: 230 },
+      ],
+    },
+    skillCodes: ['math.number.read'],
+  },
+  maze: {
+    body: {
+      type: 'maze',
+      prompt: { text: 'Giúp chú rồng tìm đường về lâu đài' },
+      image: '00000000-0000-0000-0000-000000000000',
+      width: 800,
+      height: 1000,
+      path: [
+        [400, 150],
+        [400, 260],
+        [180, 260],
+        [180, 820],
+      ],
+      tolerance: 30,
+    },
+  },
+  trace: {
+    body: {
+      type: 'trace',
+      prompt: { text: 'Tô theo nét số 1' },
+      width: 300,
+      height: 400,
+      paths: [
+        [
+          [110, 110],
+          [160, 60],
+          [160, 340],
+        ],
+      ],
+      tolerance: 18,
+    },
+  },
+  arith_gen: {
+    body: { type: 'arith_gen', ops: ['+', '-'], max: 10, count: 20 },
+    skillCodes: ['math.add.within10', 'math.sub.within10'],
+  },
 }
 
 export const generatePracticePrompt = (childName?: string) => `Soạn một bài luyện tập cho ${childName ? `bé ${childName}` : 'một bé'} đúng chỗ bé còn yếu, trong app For-Kids.
@@ -110,8 +161,13 @@ Quy trình:
    - Đọc giờ trên đồng hồ → dùng prompt.clock {h, m} (app tự vẽ, KHÔNG cắt ảnh đồng hồ).
    - So sánh < > =, điền dấu → fill_blank với input 'choice'. Số → input 'number'. Giờ → input 'time'.
    - Trắc nghiệm A–D → single_choice (phương án có thể chỉ là hình).
-   - Tô số theo nét, flashcard, poster → info (không chấm).
+   - Tìm và khoanh/tô/chạm đồ vật, số giống nhau trên hình (hidden objects, Number Scramble) → hotspot: ảnh + các vùng đúng (hình chữ nhật theo pixel).
+   - Mê cung vẽ đường → maze: ảnh + lối đi đúng (đường gấp khúc theo giữa lối, từ xuất phát tới đích), tolerance ≈ nửa bề rộng lối. Mê cung có đánh số lối → single_choice.
+   - Tô theo nét (số, chữ, đường cong) → trace: các nét mẫu (đường gấp khúc theo tâm nét), tolerance ≈ nửa bề rộng nét. Không có ảnh thì app tự vẽ nét đứt.
+   - Phiếu cộng trừ ngẫu nhiên "trong phạm vi N" (file Excel tự tạo) → arith_gen: chỉ cần ops, max, count; mỗi lần bé làm server sinh đề mới.
+   - Flashcard, poster → info (không chấm).
 3. Hình minh hoạ (đồ vật để đếm, quy luật hình…): cắt ảnh, gọi upload_asset, dùng assetId trả về trong imageAssetId.
+   Câu hotspot / maze / trace: ảnh đặt ở trường image (không đặt trong prompt), width/height đúng bằng kích thước ảnh đã upload, mọi toạ độ theo pixel của ảnh đó (gốc góc trên trái). Vector trong PDF (nét đứt, tường mê cung) đọc được toạ độ trực tiếp; nhớ đổi theo tỉ lệ khi render ảnh.
 4. Gắn skillCodes có sẵn; thiếu thì upsert_topic / upsert_skill trước.
 5. Viết explanation ngắn, dễ hiểu cho trẻ.
 6. Gọi create_worksheet (bài tạo ra là nháp). Lỗi sẽ chỉ rõ đường dẫn trường sai, sửa rồi gọi lại.

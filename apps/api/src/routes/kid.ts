@@ -1,14 +1,15 @@
 import { SaveAnswersInput, StartAttemptInput, type KidHome, type LibraryItem } from '@for-kids/shared'
-import { and, desc, eq, sql } from 'drizzle-orm'
+import { and, desc, eq } from 'drizzle-orm'
 import type { FastifyInstance, FastifyRequest } from 'fastify'
 import { requireKid, requireSession } from '../auth/session.js'
 import { findActiveChild } from '../db/children.js'
-import { question, subject, topic, worksheet } from '../db/schema.js'
+import { subject, topic, worksheet } from '../db/schema.js'
 import type { Deps } from '../deps.js'
 import { idParam, parse } from '../http.js'
 import { listAssignments } from '../services/assignments.js'
 import { bestByWorksheet, getAttemptView, saveAnswers, startAttempt, startReview, submitAttempt } from '../services/attempts.js'
 import { familyTimezone, reviewDueCount, starBalance, streakFor } from '../services/progress.js'
+import { questionCount } from '../services/worksheets.js'
 import { achievements, redeemReward } from '../services/rewards.js'
 
 /** API của bé (§7): mọi thứ giới hạn trong bé đang được chọn. */
@@ -33,7 +34,7 @@ export function kidRoutes(app: FastifyInstance, deps: Deps) {
         topic: topic.name,
         grade: worksheet.grade,
         timeLimitSec: worksheet.timeLimitSec,
-        questionCount: sql<number>`(select count(*)::int from ${question} where ${question.worksheetId} = ${worksheet.id})`,
+        questionCount,
       })
       .from(worksheet)
       .innerJoin(subject, eq(subject.id, worksheet.subjectId))

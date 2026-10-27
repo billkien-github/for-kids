@@ -271,4 +271,62 @@ describe('làm bài', () => {
     expect(r.isError).toBe(true)
     expect(r.text).toContain('questions[0].body.type')
   })
+
+  it('bài tự sinh: mỗi lần làm một bộ phép tính mới, chấm như câu điền số, không vào hàng đợi ôn', async () => {
+    const worksheetId = await publishedAndAssigned({
+      title: 'Cộng trừ trong phạm vi 10 (tự sinh)',
+      questions: [{ body: { type: 'arith_gen', ops: ['+', '-'], max: 10, count: 8 }, skillCodes: ['math.add.within10'] }],
+    })
+    const home = await ok<KidHome>({ method: 'GET', url: '/api/kid/home' })
+    expect(home.today.find((a) => a.worksheet.id === worksheetId)?.worksheet.questionCount).toBe(8)
+
+    const first = await ok<AttemptView>({ method: 'POST', url: '/api/kid/attempts', payload: { worksheetId } })
+    expect(first.items).toHaveLength(8)
+    expect(first.items.every((i) => i.body.type === 'fill_blank')).toBe(true)
+    const answers = first.items.map((item) => {
+      const [a, op, b] = (item.body as { prompt: { text: string } }).prompt.text.split(' ')
+      return { itemId: item.id, response: { blanks: { '1': String(op === '+' ? Number(a) + Number(b) : Number(a) - Number(b)) } } }
+    })
+    // Sai một câu: vẫn không có gì để ôn vì câu sinh ra không gắn với câu gốc.
+    answers[0]!.response.blanks['1'] = '99'
+    await ok({ method: 'PUT', url: `/api/kid/attempts/${first.id}/answers`, payload: { answers } })
+    const done = await ok<AttemptView>({ method: 'POST', url: `/api/kid/attempts/${first.id}/submit` })
+    expect(done.result!.scorePct).toBe(87.5)
+    expect((await call({ method: 'POST', url: '/api/kid/review' })).statusCode).toBe(409)
+
+    const second = await ok<AttemptView>({ method: 'POST', url: '/api/kid/attempts', payload: { worksheetId } })
+    const texts = (v: AttemptView) => v.items.map((i) => (i.body as { prompt: { text: string } }).prompt.text).join('|')
+    expect(texts(second)).not.toBe(texts(first))
+  })
+
+  it('câu chạm vào hình / mê cung: bé không thấy đáp án, server chấm theo toạ độ', async () => {
+    const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAwS2OUAAAAABJRU5ErkJggg==', 'base64')
+    const image = (await callTool(token, 'upload_asset', { filename: 'a.png', mime: 'image/png', base64: png.toString('base64') })).data.assetId
+    const worksheetId = await publishedAndAssigned({
+      layout: 'one_per_screen',
+      questions: [
+        { body: { type: 'hotspot', prompt: { text: 'Chạm vào số 1' }, image, width: 100, height: 100, targets: [{ x: 0, y: 0, w: 20, h: 20 }] } },
+        { body: { type: 'maze', prompt: { text: 'Tìm đường' }, image, width: 100, height: 100, path: [[10, 10], [90, 10]], tolerance: 8 } },
+      ],
+    })
+    const view = await ok<AttemptView>({ method: 'POST', url: '/api/kid/attempts', payload: { worksheetId } })
+    const [hot, maze] = view.items as unknown as Record<string, unknown>[]
+    expect(hot!.body).not.toHaveProperty('targets')
+    expect(hot!.body).toMatchObject({ targetCount: 1 })
+    expect(maze!.body).not.toHaveProperty('path')
+    expect(maze!.body).toMatchObject({ start: [10, 10], end: [90, 10] })
+
+    await ok({
+      method: 'PUT',
+      url: `/api/kid/attempts/${view.id}/answers`,
+      payload: {
+        answers: [
+          { itemId: hot!.id, response: { taps: [[5, 5]] } },
+          { itemId: maze!.id, response: { strokes: [[[10, 12], [50, 9], [90, 11]]] } },
+        ],
+      },
+    })
+    const done = await ok<AttemptView>({ method: 'POST', url: `/api/kid/attempts/${view.id}/submit` })
+    expect(done.result!.scorePct).toBe(100)
+  })
 })

@@ -26,6 +26,9 @@ Cách tách câu, chọn loại câu hỏi, upload ảnh: theo hướng dẫn c�
    - `fill_blank`, `number_input`: cùng nội dung đề (bỏ qua khoảng trắng) và cùng đáp án
    - câu có `prompt.clock`: cùng `{h, m}` và cùng loại câu
    - `single_choice`, `multi_choice`, `true_false`: cùng đề và cùng các phương án
+   - `hotspot`, `maze`: cùng `image` (ảnh khử trùng theo nội dung nên cùng ảnh nguồn thì cùng assetId)
+   - `trace`: cùng `image` và cùng nét mẫu
+   - `arith_gen`: cùng `ops`, `min`, `max`, `missing`
 
 Xử lý:
 - **Toàn bộ đã có:** không tạo bài. Báo lại cho phụ huynh là trùng với bài nào, rồi chuyển file sang bước 3.

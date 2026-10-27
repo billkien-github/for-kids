@@ -1,5 +1,6 @@
 import { deriveSplit, type Blank, type Choice, type QuestionBody, type QuestionType } from '@for-kids/shared'
 import type { ReactNode } from 'react'
+import { ArithGenEditor, HotspotEditor, MazeEditor, TraceEditor } from './DrawEditors'
 import { fieldClass, RichTextEditor } from './RichTextEditor'
 
 export const TYPE_LABEL: Record<QuestionType, string> = {
@@ -14,6 +15,10 @@ export const TYPE_LABEL: Record<QuestionType, string> = {
   clock_set: 'Quay kim đồng hồ',
   column_arith: 'Đặt tính dọc',
   info: 'Thẻ bài học (không chấm)',
+  hotspot: 'Chạm vào hình',
+  maze: 'Mê cung (vẽ đường)',
+  trace: 'Tô theo nét',
+  arith_gen: 'Phép tính tự sinh',
 }
 
 const letters = 'abcdefghijklmnopqrstuvwxyz'
@@ -54,6 +59,15 @@ export function newBody(type: QuestionType): QuestionBody {
       return { type, op: '+', operands: [14, 78] }
     case 'info':
       return { type, prompt: { text: '' } }
+    // Câu trên ảnh: chọn ảnh xong mới có kích thước và toạ độ.
+    case 'hotspot':
+      return { type, prompt: { text: 'Tìm và chạm vào…' }, image: '', width: 0, height: 0, targets: [] }
+    case 'maze':
+      return { type, prompt: { text: 'Tìm đường đi' }, image: '', width: 0, height: 0, path: [], tolerance: 20 }
+    case 'trace':
+      return { type, prompt: { text: 'Tô theo nét' }, width: 400, height: 400, paths: [], tolerance: 16 }
+    case 'arith_gen':
+      return { type, ops: ['+'], max: 10, count: 20 }
   }
 }
 
@@ -435,5 +449,13 @@ export function BodyEditor({ body, onChange }: { body: QuestionBody; onChange: (
           </button>
         </div>
       )
+    case 'hotspot':
+      return <HotspotEditor body={body} onChange={onChange} />
+    case 'maze':
+      return <MazeEditor body={body} onChange={onChange} />
+    case 'trace':
+      return <TraceEditor body={body} onChange={onChange} />
+    case 'arith_gen':
+      return <ArithGenEditor body={body} onChange={onChange} />
   }
 }

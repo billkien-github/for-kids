@@ -8,6 +8,13 @@ import { Stars } from './kid/ResultView'
 const SUBJECT_ICON: Record<string, string> = { math: '🔢', vi: '📖', en: '🔤' }
 const NO_TOPIC = 'Khác'
 
+const SHOW_FILTER = {
+  all: { label: 'Tất cả', keep: () => true },
+  todo: { label: 'Ẩn bài đủ 3 ⭐', keep: (w: LibraryItem) => w.bestStars === null || w.bestStars < 3 },
+  new: { label: 'Chỉ bài mới', keep: (w: LibraryItem) => w.bestStars === null },
+}
+type ShowFilter = keyof typeof SHOW_FILTER
+
 const dueLabel = (iso: string) => new Date(iso).toLocaleString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
 
 const greeting = () => {
@@ -50,13 +57,21 @@ export function KidHomePage() {
   }
   const open = (worksheetId: string, assignmentId?: string) => go(() => post<AttemptView>('/kid/attempts', { worksheetId, assignmentId }))
 
+  // Ẩn bài đã xong: lọc trước để số bài trên các tab khớp với bài đang hiện.
+  const showParam = params.get('show') ?? ''
+  const show: ShowFilter = Object.hasOwn(SHOW_FILTER, showParam) ? (showParam as ShowFilter) : 'all'
+  const visible = library.filter(SHOW_FILTER[show].keep)
+  const hiddenCount = library.length - visible.length
+
   // Xem lớp khác: hiện tab lớp, mặc định "Tất cả lớp".
+  // Tab lớp lấy theo cả kho (lọc xong mà lớp đang chọn hết bài thì vẫn giữ tab đó), số đếm theo bài đang hiện.
   const gradeCounts = new Map<number, number>()
-  for (const w of library) gradeCounts.set(w.grade, (gradeCounts.get(w.grade) ?? 0) + 1)
+  for (const w of library) gradeCounts.set(w.grade, gradeCounts.get(w.grade) ?? 0)
+  for (const w of visible) gradeCounts.set(w.grade, gradeCounts.get(w.grade)! + 1)
   const grades = [...gradeCounts].sort(([a], [b]) => a - b)
   const pickedGrade = params.get('grade') === null ? null : Number(params.get('grade'))
   const grade = !allGrades ? child.grade : pickedGrade !== null && gradeCounts.has(pickedGrade) ? pickedGrade : null
-  const ofGrade = grade === null ? library : library.filter((w) => w.grade === grade)
+  const ofGrade = grade === null ? visible : visible.filter((w) => w.grade === grade)
   const subjects = [...new Map(ofGrade.map((w) => [w.subjectCode, w.subjectName])).entries()]
   const subject = subjects.some(([code]) => code === params.get('subject')) ? params.get('subject') : null
   const ofSubject = ofGrade.filter((w) => !subject || w.subjectCode === subject)
@@ -134,9 +149,24 @@ export function KidHomePage() {
             Xem bài của lớp khác
           </label>
         </div>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <span className="text-base text-slate-600">Hiện:</span>
+          {(Object.keys(SHOW_FILTER) as ShowFilter[]).map((k) => (
+            <button
+              key={k}
+              type="button"
+              aria-pressed={show === k}
+              onClick={() => setFilter({ show: k === 'all' ? null : k })}
+              className={`min-h-touch rounded-full px-4 text-base ${show === k ? 'bg-slate-700 font-semibold text-white' : 'bg-white text-slate-700 ring-1 ring-slate-200'}`}
+            >
+              {SHOW_FILTER[k].label}
+            </button>
+          ))}
+          {hiddenCount > 0 && <span className="text-sm text-slate-500">Đang ẩn {hiddenCount} bài</span>}
+        </div>
         {allGrades && grades.length > 1 && (
           <TabBar>
-            <Tab active={grade === null} count={library.length} onClick={() => setFilter({ grade: null })}>
+            <Tab active={grade === null} count={visible.length} onClick={() => setFilter({ grade: null })}>
               Tất cả lớp
             </Tab>
             {grades.map(([g, n]) => (
@@ -171,7 +201,15 @@ export function KidHomePage() {
             ))}
           </TabBar>
         )}
-        {shown.length === 0 && <p className="mt-3 text-slate-500">Chưa có bài nào ở đây.</p>}
+        {shown.length === 0 && (
+          <p className="mt-3 text-slate-500">
+            {hiddenCount === 0
+              ? 'Chưa có bài nào ở đây.'
+              : show === 'new'
+                ? 'Ở đây không còn bài mới. Chọn "Tất cả" để làm lại cho đủ 3 ⭐ nhé.'
+                : 'Con làm hết bài ở đây rồi! 🎉'}
+          </p>
+        )}
         <ul className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
           {shown.map((w) => (
             <LibraryCard key={w.id} w={w} onOpen={() => open(w.id)} />
@@ -213,19 +251,31 @@ function Tab({ active, count, onClick, children }: { active: boolean; count?: nu
   )
 }
 
+// Bài mới nổi nhất; bài đủ 3 sao chìm xuống để bé thấy ngay còn bài nào cần làm.
+const CARD_STYLE = {
+  new: 'bg-white shadow-md ring-2 ring-amber-300',
+  retry: 'bg-white shadow-sm',
+  done: 'bg-slate-100/70 ring-1 ring-slate-200',
+}
+
 function LibraryCard({ w, onOpen }: { w: LibraryItem; onOpen: () => void }) {
+  const state = w.bestStars === null ? 'new' : w.bestStars < 3 ? 'retry' : 'done'
   return (
     <li>
-      <button type="button" onClick={onOpen} className="flex h-full w-full flex-col gap-1 rounded-2xl bg-white p-4 text-left shadow-sm active:scale-[0.98]">
-        <span className="font-semibold">{w.title}</span>
+      <button type="button" onClick={onOpen} className={`flex h-full w-full flex-col gap-1 rounded-2xl p-4 text-left active:scale-[0.98] ${CARD_STYLE[state]}`}>
+        <span className={`font-semibold ${state === 'done' ? 'text-slate-500' : ''}`}>{w.title}</span>
         {w.topic && <span className="text-sm text-slate-500">{w.topic}</span>}
         <span className="mt-auto pt-2">
           {w.bestStars === null ? (
-            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-sm font-semibold text-amber-800">✨ Bài mới</span>
+            <span className="rounded-full bg-amber-400 px-2.5 py-0.5 text-sm font-bold text-white">✨ Bài mới</span>
+          ) : state === 'done' ? (
+            <span className="flex items-center gap-2 text-sm font-semibold text-emerald-700">
+              <Stars count={3} size="text-base" /> Xong rồi
+            </span>
           ) : (
             <span className="flex flex-col">
               <Stars count={w.bestStars} size="text-xl" />
-              {w.bestStars < 3 && <span className="text-xs text-slate-500">Làm lại lấy đủ 3 sao!</span>}
+              <span className="text-xs text-slate-500">Làm lại lấy đủ 3 sao!</span>
             </span>
           )}
         </span>

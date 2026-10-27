@@ -198,7 +198,8 @@ export async function updateWorksheet(db: Db, familyId: string, id: string, patc
   })
 }
 
-const questionCount = sql<number>`(select count(*)::int from ${question} where ${question.worksheetId} = ${worksheet.id})`
+/** Số câu bé làm mỗi lần: câu tự sinh (arith_gen) tính theo số phép tính nó sinh ra. */
+export const questionCount = sql<number>`(select coalesce(sum(case when ${question.type} = 'arith_gen' then (${question.body}->>'count')::int else 1 end), 0)::int from ${question} where ${question.worksheetId} = ${worksheet.id})`
 
 const summaryColumns = {
   id: worksheet.id,

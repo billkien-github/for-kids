@@ -1,4 +1,5 @@
-import { blankMatches, columnArithResult, deriveSplit, gradeQuestion } from '@for-kids/shared'
+import { blankMatches, columnArithResult, deriveSplit, expandArithGen, gradeQuestion } from '@for-kids/shared'
+import { useState } from 'react'
 import { RichText } from '../RichText'
 import { field, handwrittenDigits, inputClass, type QuestionProps } from './common'
 
@@ -165,6 +166,31 @@ export function Info({ body, lang }: QuestionProps<'info'>) {
   return (
     <div className="flex flex-col gap-6">
       {body.pages?.map((p, i) => <RichText key={i} value={p} lang={lang} />)}
+    </div>
+  )
+}
+
+/** Bài tự sinh: bé không gặp loại này (server sinh thành các câu điền số); phụ huynh xem vài ví dụ. */
+export function ArithGen({ body }: QuestionProps<'arith_gen'>) {
+  const [seed, setSeed] = useState(() => String(Math.random()))
+  const sample = expandArithGen(body, seed, Math.min(body.count, 6))
+  const ops = body.ops.map((o) => (o === '+' ? 'cộng' : 'trừ')).join(', ')
+  return (
+    <div className="flex flex-col gap-3">
+      <p className="text-base text-slate-600">
+        Mỗi lần con làm, app tự tạo <b>{body.count}</b> phép {ops} mới trong phạm vi {body.max}
+        {body.min ? ` (số nhỏ nhất ${body.min})` : ''}. Ví dụ:
+      </p>
+      <ul className="grid grid-cols-2 gap-2 font-mono sm:grid-cols-3">
+        {sample.map((g, i) => (
+          <li key={i} className="rounded-xl bg-white px-3 py-2 shadow-sm">
+            {g.body.prompt.text!.replace('{{1}}', '□')}
+          </li>
+        ))}
+      </ul>
+      <button type="button" onClick={() => setSeed(String(Math.random()))} className="min-h-touch self-start rounded-xl bg-slate-100 px-4 text-base">
+        🔀 Ví dụ khác
+      </button>
     </div>
   )
 }

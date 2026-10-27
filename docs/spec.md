@@ -129,7 +129,19 @@ type QuestionBody =
   | { type: 'column_arith';  prompt?: RichText; op: '+' | '-'; operands: [number, number]; showCarry?: boolean }
   // Thẻ bài học / poster / flashcard: không chấm, không tính điểm, không vào danh sách ôn.
   | { type: 'info';          prompt: RichText; pages?: RichText[] }
+  // Câu trên ảnh: toạ độ (điểm [x, y], hình chữ nhật {x, y, w, h}) theo pixel của ảnh `image`, gốc góc trên trái;
+  // width/height là kích thước ảnh đó. tolerance (pixel) ≈ nửa bề rộng lối đi / nét chữ.
+  | { type: 'hotspot'; prompt: RichText; image: string; width: number; height: number; targets: Rect[] }   // chạm vào các vùng đúng
+  | { type: 'maze';    prompt: RichText; image: string; width: number; height: number;
+      path: [number, number][]; tolerance: number }      // lối đi đúng, theo giữa lối, từ xuất phát tới đích
+  | { type: 'trace';   prompt: RichText; image?: string; width: number; height: number;
+      paths: [number, number][][]; tolerance: number }   // nét mẫu; không có ảnh thì app tự vẽ nét đứt
+  // Bài tự sinh: lúc bé bắt đầu làm, server sinh `count` phép tính mới thành các câu fill_blank.
+  // Cộng: tổng ≤ max; trừ: số trừ ≤ số bị trừ ≤ max. missing: ô trống ở kết quả (mặc định), ở một số hạng, hoặc trộn.
+  | { type: 'arith_gen'; ops: ('+' | '-')[]; min?: number; max: number; count: number; missing?: 'result' | 'operand' | 'mixed' }
 ```
+
+**Câu tự sinh (`arith_gen`)**: mỗi bài có tối đa 200 phép tính sinh ra. Câu sinh ra được chấm như `fill_blank`, tính vào mức thành thạo kỹ năng, nhưng không gắn với câu gốc nên không vào danh sách ôn (lần làm sau đã là đề mới). Số câu của bài (`questionCount`) tính theo `count`.
 
 **`split_strategy`**: giữ nguyên `a`, tách `b` để `a` tròn chục. Gọi `T` là số tròn chục mà `a` được làm tròn tới.
 
@@ -154,6 +166,10 @@ Quy tắc chấm (chạy ở server, mỗi câu được điểm từ 0 đến 1
 | `clock_set` | Đúng hết hoặc 0 điểm. Kim phút phải đúng `m`. Kim giờ được tính đúng nếu lệch không quá ±15° so với vị trí chuẩn (vị trí chuẩn có tính phần phút, ví dụ 3:30 thì kim giờ nằm giữa số 3 và số 4). Với `hands = 'hour'`, kim phút được vẽ sẵn ở số 12. |
 | `column_arith` | Đúng hết hoặc 0 điểm, chỉ chấm dãy số ở hàng kết quả. Ô nhớ (`showCarry`) chỉ để bé ghi nhớ, không chấm. |
 | `info` | Không chấm. `points` luôn là 0. |
+| `hotspot` | Điểm = max(0, số vùng được chạm trúng − số lần chạm ra ngoài mọi vùng) / số vùng. Chạm nhiều lần vào cùng một vùng không bị trừ. Bé chỉ biết số vùng cần tìm, không thấy vùng. |
+| `maze` | Đúng hết hoặc 0 điểm. Đúng khi: ≥ 90% nét vẽ nằm trong `tolerance` quanh lối đúng, phủ ≥ 85% lối đúng, và có điểm tới gần đích (≤ 2 × `tolerance`). Nhấc tay giữa chừng không sao. Bé thấy điểm đầu/cuối, không thấy lối đi. |
+| `trace` | Độ chính xác (tỉ lệ nét vẽ nằm trong 1,5 × `tolerance` quanh nét mẫu) dưới 70% thì 0 điểm; còn lại điểm theo độ phủ nét mẫu (phủ ≥ 85% là đủ điểm), làm tròn xuống từng 1/4. |
+| `arith_gen` | Không chấm trực tiếp: đã sinh thành các câu `fill_blank`. |
 
 `is_correct` = (`score` == 1). **Trước khi bé nộp bài, API dành cho bé không bao giờ trả về `answer`, `accept`, `pairs`.** Với `split_strategy` và `column_arith`, đáp án được suy ra từ đề nên không cần giấu.
 
@@ -369,6 +385,9 @@ Hiện không còn vấn đề mở.
 | Giá trị theo hàng (`247 = _ trăm _ chục _ đơn vị`), viết số từ chữ | `fill_blank` |
 | Phân số theo phần tô màu | `single_choice`, phương án dùng `[[2/5]]`, đề có hình |
 | Đếm đồ vật, đếm khối | `number_input` + hình |
-| Tô các số giống nhau (Bugs) | `multi_choice` |
-| Tô số theo nét, flashcard, poster đơn vị thời gian, mô hình đồng hồ | `info` (không chấm). Có thể kèm câu `number_input` "Có bao nhiêu…?" để chấm phần đếm. |
+| Tô các số giống nhau (Bugs, Number Scramble), tìm đồ vật ẩn trong tranh | `hotspot` |
+| Mê cung vẽ đường | `maze`; mê cung có đánh số lối thì `single_choice` |
+| Tô số / chữ / đường cong theo nét, tô bằng hai tay | `trace` |
+| Phiếu cộng trừ ngẫu nhiên "trong phạm vi N" (Excel tự tạo) | `arith_gen` |
+| Flashcard, poster đơn vị thời gian, mô hình đồng hồ | `info` (không chấm). Có thể kèm câu `number_input` "Có bao nhiêu…?" để chấm phần đếm. |
 | Tô ô biểu đồ (pictograph, bar graph) | Chưa có loại riêng. Tạm chuyển thành câu hỏi đọc biểu đồ (`number_input` + hình). |

@@ -1,4 +1,6 @@
+import { randomUUID } from 'node:crypto'
 import {
+  expandArithGen,
   gradeQuestion,
   localDate,
   REVIEW_SESSION_SIZE,
@@ -80,17 +82,20 @@ async function snapshotsFor(
           ),
         )
     : []
-  return qs.map((q, i) => ({
-    questionId: q.id,
-    questionSnapshot: {
-      body: q.body,
-      explanation: q.explanation,
-      points: q.points,
-      ttsLang: q.ttsLang ?? q.fallbackLang,
-      sortOrder: i,
-      skillIds: links.filter((l) => l.questionId === q.id).map((l) => l.skillId),
-    } satisfies QuestionSnapshot,
-  }))
+  const out: { questionId: string | null; questionSnapshot: QuestionSnapshot }[] = []
+  for (const q of qs) {
+    const common = { points: q.points, ttsLang: q.ttsLang ?? q.fallbackLang, skillIds: links.filter((l) => l.questionId === q.id).map((l) => l.skillId) }
+    if (q.body.type === 'arith_gen') {
+      // Bài tự sinh: mỗi lần làm một bộ phép tính mới. Câu sinh ra không gắn questionId (mỗi câu gốc chỉ có
+      // một dòng trả lời trong một lần làm), nên không vào hàng đợi ôn; mức thành thạo kỹ năng vẫn được tính.
+      for (const g of expandArithGen(q.body, randomUUID())) {
+        out.push({ questionId: null, questionSnapshot: { ...common, body: g.body, explanation: g.explanation, sortOrder: out.length } })
+      }
+      continue
+    }
+    out.push({ questionId: q.id, questionSnapshot: { ...common, body: q.body, explanation: q.explanation, sortOrder: out.length } })
+  }
+  return out
 }
 
 export async function startAttempt(

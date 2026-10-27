@@ -1,4 +1,4 @@
-import type { Choice, QuestionBody } from './question.js'
+import type { Choice, Point, QuestionBody } from './question.js'
 
 /** Câu hỏi gửi cho bé trước khi nộp: không có đáp án (§4: không trả `answer`, `accept`, `pairs`). */
 export type KidQuestionBody =
@@ -15,9 +15,15 @@ export type KidQuestionBody =
   | Omit<Extract<QuestionBody, { type: 'clock_set' }>, 'answer'>
   | Extract<QuestionBody, { type: 'column_arith' }>
   | Extract<QuestionBody, { type: 'info' }>
+  | (Omit<Extract<QuestionBody, { type: 'hotspot' }>, 'targets'> & { targetCount: number })
+  // Lộ điểm đầu/cuối không lộ đáp án (ảnh mê cung đã vẽ sẵn), còn giúp app đánh dấu chỗ xuất phát và đích.
+  | (Omit<Extract<QuestionBody, { type: 'maze' }>, 'path'> & { start: Point; end: Point })
+  // Nét mẫu không phải đáp án cần giấu: app vẽ nó thành nét đứt để bé tô.
+  | Extract<QuestionBody, { type: 'trace' }>
+  | Extract<QuestionBody, { type: 'arith_gen' }>
 
-/** PRNG nhỏ (mulberry32) để xáo trộn ổn định theo từng lần làm bài. */
-function rng(seed: string) {
+/** PRNG nhỏ (mulberry32) để xáo trộn / sinh đề ổn định theo `seed`. */
+export function seededRandom(seed: string) {
   let h = 1779033703 ^ seed.length
   for (let i = 0; i < seed.length; i++) h = Math.imul(h ^ seed.charCodeAt(i), 3432918353)
   let a = h >>> 0
@@ -31,7 +37,7 @@ function rng(seed: string) {
 
 export function seededShuffle<T>(items: readonly T[], seed: string): T[] {
   const out = [...items]
-  const rand = rng(seed)
+  const rand = seededRandom(seed)
   for (let i = out.length - 1; i > 0; i--) {
     const j = Math.floor(rand() * (i + 1))
     ;[out[i], out[j]] = [out[j]!, out[i]!]
@@ -78,9 +84,19 @@ export function sanitizeForKid(q: QuestionBody, seed: string): KidQuestionBody {
       const { answer: _answer, ...rest } = q
       return rest
     }
+    case 'hotspot': {
+      const { targets, ...rest } = q
+      return { ...rest, targetCount: targets.length }
+    }
+    case 'maze': {
+      const { path, ...rest } = q
+      return { ...rest, start: path[0]!, end: path[path.length - 1]! }
+    }
     case 'split_strategy':
     case 'column_arith':
     case 'info':
+    case 'trace':
+    case 'arith_gen':
       return q
   }
 }

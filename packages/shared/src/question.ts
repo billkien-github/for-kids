@@ -173,6 +173,87 @@ const ColumnArith = z
 
 const Info = z.object({ type: z.literal('info'), prompt: RichText, pages: z.array(RichText).optional() })
 
+// ---------- Câu vẽ/chạm trên ảnh: toạ độ theo pixel của ảnh gốc, gốc ở góc trên trái ----------
+
+export const Point = z.tuple([z.number(), z.number()])
+const Rect = z.object({ x: z.number(), y: z.number(), w: z.number().positive(), h: z.number().positive() })
+const canvas = {
+  /** Kích thước ảnh (pixel). Toạ độ trong đề và trong câu trả lời đều theo hệ này. */
+  width: z.number().positive().max(10000),
+  height: z.number().positive().max(10000),
+}
+/** Bán kính sai lệch cho phép quanh nét (pixel), thường bằng nửa bề rộng lối đi / nét chữ. */
+const tolerance = z.number().min(1)
+
+function pointsInside(points: [number, number][], w: { width: number; height: number }, path: (string | number)[], ctx: z.RefinementCtx) {
+  if (points.some(([x, y]) => x < 0 || y < 0 || x > w.width || y > w.height)) {
+    ctx.addIssue({ code: 'custom', path, message: `Toạ độ phải nằm trong ảnh (0..${w.width}, 0..${w.height})` })
+  }
+}
+
+const Hotspot = z
+  .object({
+    type: z.literal('hotspot'),
+    prompt: RichText,
+    image: z.uuid(),
+    ...canvas,
+    /** Các vùng đúng (hình chữ nhật). Bé chạm trúng mỗi vùng ít nhất một lần. */
+    targets: z.array(Rect).min(1).max(50),
+  })
+  .superRefine((q, ctx) => {
+    for (const [i, r] of q.targets.entries()) {
+      pointsInside([[r.x, r.y], [r.x + r.w, r.y + r.h]], q, ['targets', i], ctx)
+    }
+  })
+
+const Maze = z
+  .object({
+    type: z.literal('maze'),
+    prompt: RichText,
+    image: z.uuid(),
+    ...canvas,
+    /** Lối đi đúng, từ điểm xuất phát tới đích, đi theo giữa lối. */
+    path: z.array(Point).min(2).max(1000),
+    tolerance,
+  })
+  .superRefine((q, ctx) => pointsInside(q.path, q, ['path'], ctx))
+
+const Trace = z
+  .object({
+    type: z.literal('trace'),
+    prompt: RichText,
+    /** Ảnh có sẵn nét mờ để tô. Không có ảnh thì app tự vẽ `paths` thành nét đứt. */
+    image: z.uuid().optional(),
+    ...canvas,
+    /** Các nét mẫu (mỗi nét là một đường gấp khúc). */
+    paths: z.array(z.array(Point).min(1).max(1000)).min(1).max(30),
+    tolerance,
+  })
+  .superRefine((q, ctx) => q.paths.forEach((p, i) => pointsInside(p, q, ['paths', i], ctx)))
+
+// ---------- Bài tự sinh: mỗi lần bé làm, server sinh `count` phép tính mới thành các câu fill_blank ----------
+
+const ArithGen = z
+  .object({
+    type: z.literal('arith_gen'),
+    ops: z.array(z.enum(['+', '-'])).min(1).max(2),
+    /** Số nhỏ nhất của mỗi số hạng (mặc định 0). */
+    min: z.number().int().min(0).optional(),
+    /** Phạm vi: mọi số trong phép tính (kể cả kết quả) không vượt quá `max`. */
+    max: z.number().int().min(1).max(1000),
+    count: z.number().int().min(1).max(50),
+    /** Ô bé điền: kết quả (mặc định), một số hạng, hoặc trộn cả hai. */
+    missing: z.enum(['result', 'operand', 'mixed']).optional(),
+  })
+  .superRefine((q, ctx) => {
+    if (new Set(q.ops).size !== q.ops.length) ctx.addIssue({ code: 'custom', path: ['ops'], message: 'Phép tính bị lặp' })
+    if ((q.min ?? 0) >= q.max) ctx.addIssue({ code: 'custom', path: ['min'], message: 'min phải nhỏ hơn max' })
+    // Cộng hai số đều ≥ min mà tổng ≤ max thì cần 2 × min ≤ max.
+    else if (q.ops.includes('+') && 2 * (q.min ?? 0) > q.max) {
+      ctx.addIssue({ code: 'custom', path: ['min'], message: 'Có phép cộng thì 2 × min không được vượt max' })
+    }
+  })
+
 export const QuestionBody = z.discriminatedUnion('type', [
   SingleChoice,
   MultiChoice,
@@ -185,6 +266,10 @@ export const QuestionBody = z.discriminatedUnion('type', [
   ClockSet,
   ColumnArith,
   Info,
+  Hotspot,
+  Maze,
+  Trace,
+  ArithGen,
 ])
 
 export type QuestionType = z.infer<typeof QuestionBody>['type']
@@ -198,7 +283,11 @@ export const GRID_QUESTION_TYPES: readonly QuestionType[] = [
   'single_choice',
   'split_strategy',
   'column_arith',
+  'arith_gen',
 ]
+
+/** Số câu tối đa của một lần làm bài, tính cả các phép tính câu arith_gen sinh ra (khớp trần lưu câu trả lời). */
+export const MAX_ITEMS_PER_ATTEMPT = 200
 
 export const QuestionInput = z
   .object({
@@ -233,6 +322,10 @@ export const WorksheetPatch = WorksheetFields.partial().extend({ layout: z.enum(
 export type WorksheetPatch = z.infer<typeof WorksheetPatch>
 
 export const WorksheetInput = WorksheetFields.superRefine((w, ctx) => {
+    const items = w.questions.reduce((n, q) => n + (q.body.type === 'arith_gen' ? q.body.count : 1), 0)
+    if (items > MAX_ITEMS_PER_ATTEMPT) {
+      ctx.addIssue({ code: 'custom', path: ['questions'], message: `Mỗi lần làm tối đa ${MAX_ITEMS_PER_ATTEMPT} câu (câu arith_gen tính theo count)` })
+    }
     if (w.layout !== 'grid') return
     for (const [i, q] of w.questions.entries()) {
       if (!GRID_QUESTION_TYPES.includes(q.body.type)) {
@@ -246,6 +339,7 @@ export const WorksheetInput = WorksheetFields.superRefine((w, ctx) => {
   })
 
 export type ClockTime = z.infer<typeof ClockTime>
+export type Point = z.infer<typeof Point>
 export type RichText = z.infer<typeof RichText>
 export type Choice = z.infer<typeof Choice>
 export type Blank = z.infer<typeof Blank>

@@ -28,7 +28,7 @@ export function InlineText({ text, renderBlank }: { text: string; renderBlank?: 
   )
 }
 
-export function SpeakButton({ text, lang, small }: { text: string; lang: string; small?: boolean }) {
+export function SpeakButton({ text, lang }: { text: string; lang: string }) {
   return (
     <button
       type="button"
@@ -36,10 +36,14 @@ export function SpeakButton({ text, lang, small }: { text: string; lang: string;
         e.stopPropagation()
         speak(text, lang)
       }}
-      className={`shrink-0 rounded-full bg-sky-100 active:bg-sky-200 ${small ? 'size-9 text-base' : 'size-12 text-xl'}`}
+      className="grid size-11 shrink-0 place-items-center rounded-full bg-sky-500 text-white shadow-md ring-2 shadow-sky-300/60 ring-white transition active:scale-95 active:bg-sky-600"
       aria-label="Đọc to"
     >
-      🔊
+      <svg viewBox="0 0 24 24" className="size-6" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <path d="M11 5 6 9H3v6h3l5 4z" fill="currentColor" />
+        <path d="M15.5 8.5a5 5 0 0 1 0 7" />
+        <path d="M18.5 5.5a9 9 0 0 1 0 13" />
+      </svg>
     </button>
   )
 }
@@ -59,23 +63,25 @@ export function RichText({ value, lang, renderBlank, clockSize = 160, className 
   return (
     <div className={`flex flex-col items-center gap-3 ${className ?? ''}`}>
       {(value.text || value.sub) && (
-        <div className="flex w-full items-start gap-3">
-          <div className="flex-1">
-            {value.text && (
+        // Lưới 2 cột: nút đọc của dòng chính và dòng dịch cùng cỡ, thẳng một cột bên phải.
+        <div className={`grid w-full items-center gap-x-3 gap-y-2 ${lang ? 'grid-cols-[1fr_auto]' : 'grid-cols-1'}`}>
+          {/* Đề không có chữ nhưng có câu đọc riêng (ttsText) vẫn cần nút đọc. */}
+          {(value.text || (lang && spoken)) && (
+            <>
               <p className="leading-relaxed whitespace-pre-line">
-                <InlineText text={value.text} renderBlank={renderBlank} />
+                <InlineText text={value.text ?? ''} renderBlank={renderBlank} />
               </p>
-            )}
-            {value.sub && (
-              <p className="mt-1 flex items-center gap-2 text-[0.85em] text-slate-500 italic">
-                <span className="flex-1">
-                  <InlineText text={value.sub.text} />
-                </span>
-                {lang && <SpeakButton text={value.sub.text} lang={value.sub.lang} small />}
+              {lang && (spoken ? <SpeakButton text={spoken} lang={lang} /> : <span />)}
+            </>
+          )}
+          {value.sub && (
+            <>
+              <p className="text-[0.85em] text-slate-500 italic">
+                <InlineText text={value.sub.text} />
               </p>
-            )}
-          </div>
-          {lang && spoken && <SpeakButton text={spoken} lang={lang} />}
+              {lang && <SpeakButton text={value.sub.text} lang={value.sub.lang} />}
+            </>
+          )}
         </div>
       )}
       {value.imageAssetId && (

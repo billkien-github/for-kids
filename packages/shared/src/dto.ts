@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import type { QuestionResponse } from './grading.js'
-import type { QuestionBody } from './question.js'
+import { MAX_ITEMS_PER_ATTEMPT, type QuestionBody } from './question.js'
 import type { KidQuestionBody } from './sanitize.js'
 
 // Dữ liệu trả về của REST API cho bài tập, giao bài, làm bài. Thời điểm là chuỗi ISO.
@@ -241,7 +241,7 @@ export const StartAttemptInput = z.object({ worksheetId: z.uuid(), assignmentId:
 export const SaveAnswersInput = z.object({
   answers: z
     .array(z.object({ itemId: z.uuid(), response: z.unknown(), timeMs: z.number().int().min(0).nullish() }))
-    .max(200),
+    .max(MAX_ITEMS_PER_ATTEMPT),
 })
 export type SaveAnswersInput = z.infer<typeof SaveAnswersInput>
 

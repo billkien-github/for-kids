@@ -1,8 +1,14 @@
 import { z } from 'zod'
-import type { Blank, QuestionBody, QuestionType } from './question.js'
+import { gradeHotspot, gradeMaze, gradeTrace } from './drawing.js'
+import { Point, type Blank, type QuestionBody, type QuestionType } from './question.js'
 import { deriveSplit } from './split-strategy.js'
 
 // ---------- Câu trả lời của bé (lưu ở attempt_answer.response) ----------
+
+/** Trần số nét / số điểm mỗi nét của câu vẽ. Vượt trần thì cắt bớt khi chấm, không coi cả câu là sai. */
+export const MAX_STROKES = 100
+export const MAX_STROKE_POINTS = 5000
+const Strokes = z.array(z.array(Point)).transform((s) => s.slice(0, MAX_STROKES).map((l) => l.slice(0, MAX_STROKE_POINTS)))
 
 export const ResponseSchemas = {
   single_choice: z.object({ choice: z.string() }),
@@ -18,6 +24,12 @@ export const ResponseSchemas = {
   // Dãy chữ số ở hàng kết quả, từ trái sang phải.
   column_arith: z.object({ result: z.string() }),
   info: z.object({}),
+  // Toạ độ các lần chạm / các nét vẽ, theo pixel của ảnh trong đề.
+  hotspot: z.object({ taps: z.array(Point).max(100) }),
+  maze: z.object({ strokes: Strokes }),
+  trace: z.object({ strokes: Strokes }),
+  // Không bao giờ tới tay bé: server đã sinh thành các câu fill_blank lúc bắt đầu làm.
+  arith_gen: z.object({}),
 } satisfies Record<QuestionType, z.ZodType>
 
 export type QuestionResponse<T extends QuestionType = QuestionType> = z.infer<(typeof ResponseSchemas)[T]>
@@ -84,7 +96,7 @@ export const columnArithResult = (q: Extract<QuestionBody, { type: 'column_arith
  * Câu `info` không chấm, trả về null.
  */
 export function gradeQuestion(q: QuestionBody, rawResponse: unknown): number | null {
-  if (q.type === 'info') return null
+  if (q.type === 'info' || q.type === 'arith_gen') return null
   const parsed = ResponseSchemas[q.type].safeParse(rawResponse)
   if (!parsed.success) return 0
   const r = parsed.data as never
@@ -130,6 +142,12 @@ export function gradeQuestion(q: QuestionBody, rawResponse: unknown): number | n
       const n = parseNumber((r as QuestionResponse<'column_arith'>).result)
       return n === columnArithResult(q) ? 1 : 0
     }
+    case 'hotspot':
+      return gradeHotspot(q.targets, (r as QuestionResponse<'hotspot'>).taps)
+    case 'maze':
+      return gradeMaze(q, (r as QuestionResponse<'maze'>).strokes)
+    case 'trace':
+      return gradeTrace(q, (r as QuestionResponse<'trace'>).strokes)
   }
 }
 
@@ -145,7 +163,7 @@ export const starsFor = (pct: number, thresholds: readonly number[]) => threshol
 
 /** Bé đã trả lời câu này chưa (để đánh dấu câu bỏ trống ở màn xem lại). */
 export function isAnswered(q: QuestionBody, rawResponse: unknown): boolean {
-  if (q.type === 'info') return true
+  if (q.type === 'info' || q.type === 'arith_gen') return true
   const parsed = ResponseSchemas[q.type].safeParse(rawResponse)
   if (!parsed.success) return false
   const r = parsed.data as Record<string, unknown>
@@ -162,6 +180,11 @@ export function isAnswered(q: QuestionBody, rawResponse: unknown): boolean {
       return (r.cells as string[]).every((c) => c.trim() !== '')
     case 'column_arith':
       return (r.result as string).trim() !== ''
+    case 'hotspot':
+      return (r.taps as unknown[]).length > 0
+    case 'maze':
+    case 'trace':
+      return (r.strokes as unknown[]).length > 0
     default:
       return true
   }

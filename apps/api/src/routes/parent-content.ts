@@ -73,7 +73,7 @@ export function parentContentRoutes(app: FastifyInstance, deps: Deps) {
   })
 
   app.post('/api/parent/assignments', { preHandler }, async (req, reply) => {
-    const ids = await assignWorksheet(db, familyOf(req), parse(AssignInput, req.body), 'parent')
+    const ids = await assignWorksheet(db, familyOf(req), parse(AssignInput, req.body), 'parent', deps.clock())
     reply.code(201)
     return { ids }
   })
