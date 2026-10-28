@@ -1,6 +1,6 @@
 import { deriveSplit, type Blank, type Choice, type QuestionBody, type QuestionType } from '@for-kids/shared'
 import type { ReactNode } from 'react'
-import { ArithGenEditor, HotspotEditor, MazeEditor, TraceEditor } from './DrawEditors'
+import { ArithGenEditor, ColoringEditor, HotspotEditor, MazeEditor, TraceEditor } from './DrawEditors'
 import { fieldClass, RichTextEditor } from './RichTextEditor'
 
 export const TYPE_LABEL: Record<QuestionType, string> = {
@@ -18,6 +18,7 @@ export const TYPE_LABEL: Record<QuestionType, string> = {
   hotspot: 'Chạm vào hình',
   maze: 'Mê cung (vẽ đường)',
   trace: 'Tô theo nét',
+  coloring: 'Tô màu tranh',
   arith_gen: 'Phép tính tự sinh',
 }
 
@@ -66,6 +67,8 @@ export function newBody(type: QuestionType): QuestionBody {
       return { type, prompt: { text: 'Tìm đường đi' }, image: '', width: 0, height: 0, path: [], tolerance: 20 }
     case 'trace':
       return { type, prompt: { text: 'Tô theo nét' }, width: 400, height: 400, paths: [], tolerance: 16 }
+    case 'coloring':
+      return { type, prompt: { text: 'Tô màu bức tranh' }, image: '', width: 0, height: 0 }
     case 'arith_gen':
       return { type, ops: ['+'], max: 10, count: 20 }
   }
@@ -455,6 +458,8 @@ export function BodyEditor({ body, onChange }: { body: QuestionBody; onChange: (
       return <MazeEditor body={body} onChange={onChange} />
     case 'trace':
       return <TraceEditor body={body} onChange={onChange} />
+    case 'coloring':
+      return <ColoringEditor body={body} onChange={onChange} />
     case 'arith_gen':
       return <ArithGenEditor body={body} onChange={onChange} />
   }

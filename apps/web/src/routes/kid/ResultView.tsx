@@ -1,4 +1,4 @@
-import type { AttemptView } from '@for-kids/shared'
+import { COMPLETION_ONLY_TYPES, type AttemptView } from '@for-kids/shared'
 import { useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router'
@@ -15,6 +15,12 @@ export function Stars({ count, size = 'text-5xl' }: { count: number; size?: stri
       ))}
     </span>
   )
+}
+
+const TONE = {
+  ok: { border: 'border-emerald-500', text: 'text-emerald-600' },
+  todo: { border: 'border-amber-400', text: 'text-amber-700' },
+  wrong: { border: 'border-red-400', text: 'text-red-600' },
 }
 
 const cheer = (pct: number) => (pct >= 90 ? 'Xuất sắc! 🎉' : pct >= 75 ? 'Giỏi lắm! 👏' : pct >= 50 ? 'Khá rồi, cố thêm nhé! 💪' : 'Mình làm lại nhé! 🌱')
@@ -77,18 +83,30 @@ export function ResultView({ view, timeUp, readOnly }: { view: AttemptView; time
       <ol className="mx-auto flex max-w-3xl flex-col gap-4 p-4">
         {result.items
           .filter((it) => it.body.type !== 'info')
-          .map((it, i) => (
-            <li key={it.id} className={`rounded-3xl border-l-8 bg-white p-5 shadow-sm ${it.isCorrect ? 'border-emerald-500' : 'border-red-400'}`}>
-              <p className="mb-3 flex items-center justify-between text-base font-semibold">
-                <span className="text-slate-400">Câu {i + 1}</span>
-                <span className={it.isCorrect ? 'text-emerald-600' : 'text-red-600'}>
-                  {it.isCorrect ? '✓ Đúng' : it.score && it.score > 0 ? 'Đúng một phần' : '✗ Chưa đúng, xem lại nhé'}
-                </span>
-              </p>
-              <QuestionView body={it.body} solution={it.body} response={responses.get(it.id)} lang={langOf.get(it.id) ?? 'vi-VN'} />
-              {it.explanation && <p className="mt-4 rounded-2xl bg-amber-50 p-4 text-lg">💡 {it.explanation}</p>}
-            </li>
-          ))}
+          .map((it, i) => {
+            // Tô màu không có đúng/sai, chỉ là đã tô hay chưa.
+            const completion = COMPLETION_ONLY_TYPES.includes(it.body.type)
+            const tone = it.isCorrect ? TONE.ok : completion ? TONE.todo : TONE.wrong
+            const label = completion
+              ? it.isCorrect
+                ? '🎨 Tranh của con'
+                : 'Con chưa tô bức tranh này'
+              : it.isCorrect
+                ? '✓ Đúng'
+                : it.score && it.score > 0
+                  ? 'Đúng một phần'
+                  : '✗ Chưa đúng, xem lại nhé'
+            return (
+              <li key={it.id} className={`rounded-3xl border-l-8 bg-white p-5 shadow-sm ${tone.border}`}>
+                <p className="mb-3 flex items-center justify-between text-base font-semibold">
+                  <span className="text-slate-400">Câu {i + 1}</span>
+                  <span className={tone.text}>{label}</span>
+                </p>
+                <QuestionView body={it.body} solution={it.body} response={responses.get(it.id)} lang={langOf.get(it.id) ?? 'vi-VN'} />
+                {it.explanation && <p className="mt-4 rounded-2xl bg-amber-50 p-4 text-lg">💡 {it.explanation}</p>}
+              </li>
+            )
+          })}
       </ol>
     </main>
   )

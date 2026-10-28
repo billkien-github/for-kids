@@ -5,8 +5,8 @@ const issuePaths = (r: { success: boolean; error?: { issues: { path: PropertyKey
   r.error?.issues.map((i) => i.path.join('.')) ?? []
 
 describe('QuestionBody', () => {
-  it('liệt kê đủ 15 loại câu', () => {
-    expect(QUESTION_TYPES).toHaveLength(15)
+  it('liệt kê đủ 16 loại câu', () => {
+    expect(QUESTION_TYPES).toHaveLength(16)
   })
 
   it('nhận phương án chỉ có hình hoặc chỉ có đồng hồ', () => {

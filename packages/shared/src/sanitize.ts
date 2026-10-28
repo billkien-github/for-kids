@@ -20,6 +20,7 @@ export type KidQuestionBody =
   | (Omit<Extract<QuestionBody, { type: 'maze' }>, 'path'> & { start: Point; end: Point })
   // Nét mẫu không phải đáp án cần giấu: app vẽ nó thành nét đứt để bé tô.
   | Extract<QuestionBody, { type: 'trace' }>
+  | Extract<QuestionBody, { type: 'coloring' }>
   | Extract<QuestionBody, { type: 'arith_gen' }>
 
 /** PRNG nhỏ (mulberry32) để xáo trộn / sinh đề ổn định theo `seed`. */
@@ -96,6 +97,7 @@ export function sanitizeForKid(q: QuestionBody, seed: string): KidQuestionBody {
     case 'column_arith':
     case 'info':
     case 'trace':
+    case 'coloring':
     case 'arith_gen':
       return q
   }

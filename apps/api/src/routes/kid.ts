@@ -82,7 +82,8 @@ export function kidRoutes(app: FastifyInstance, deps: Deps) {
     return getAttemptView(deps, kid(req).childId, idParam(req.params.id))
   })
 
-  app.put<{ Params: { id: string } }>('/api/kid/attempts/:id/answers', { preHandler }, async (req) => {
+  // Tranh tô màu lưu cả các nét bút (tối đa MAX_COLORING_POINTS điểm mỗi tranh), lớn hơn trần 1MB mặc định.
+  app.put<{ Params: { id: string } }>('/api/kid/attempts/:id/answers', { preHandler, bodyLimit: 8 * 1024 * 1024 }, async (req) => {
     await saveAnswers(deps, kid(req).childId, idParam(req.params.id), parse(SaveAnswersInput, req.body))
     return { ok: true }
   })

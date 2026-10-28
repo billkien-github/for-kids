@@ -136,6 +136,10 @@ export const QUESTION_EXAMPLES: Record<string, QuestionInput> = {
       tolerance: 18,
     },
   },
+  // Tranh nét đen trên nền trắng; width/height là kích thước ảnh. Không chấm đúng sai: bé tô là được điểm.
+  coloring: {
+    body: { type: 'coloring', prompt: { text: 'Tô màu chú mèo' }, image: '00000000-0000-0000-0000-000000000000', width: 800, height: 800 },
+  },
   arith_gen: {
     body: { type: 'arith_gen', ops: ['+', '-'], max: 10, count: 20 },
     skillCodes: ['math.add.within10', 'math.sub.within10'],
@@ -164,10 +168,11 @@ Quy trình:
    - Tìm và khoanh/tô/chạm đồ vật, số giống nhau trên hình (hidden objects, Number Scramble) → hotspot: ảnh + các vùng đúng (hình chữ nhật theo pixel).
    - Mê cung vẽ đường → maze: ảnh + lối đi đúng (đường gấp khúc theo giữa lối, từ xuất phát tới đích), tolerance ≈ nửa bề rộng lối. Mê cung có đánh số lối → single_choice.
    - Tô theo nét (số, chữ, đường cong) → trace: các nét mẫu (đường gấp khúc theo tâm nét), tolerance ≈ nửa bề rộng nét. Không có ảnh thì app tự vẽ nét đứt.
+   - Tranh tô màu → coloring: upload tranh nét đen nền trắng (bỏ chữ, số trang, khung trang trí), đặt ở image. Các vùng cần kín nét để bé chạm đổ màu.
    - Phiếu cộng trừ ngẫu nhiên "trong phạm vi N" (file Excel tự tạo) → arith_gen: chỉ cần ops, max, count; mỗi lần bé làm server sinh đề mới.
    - Flashcard, poster → info (không chấm).
 3. Hình minh hoạ (đồ vật để đếm, quy luật hình…): cắt ảnh, gọi upload_asset, dùng assetId trả về trong imageAssetId.
-   Câu hotspot / maze / trace: ảnh đặt ở trường image (không đặt trong prompt), width/height đúng bằng kích thước ảnh đã upload, mọi toạ độ theo pixel của ảnh đó (gốc góc trên trái). Vector trong PDF (nét đứt, tường mê cung) đọc được toạ độ trực tiếp; nhớ đổi theo tỉ lệ khi render ảnh.
+   Câu hotspot / maze / trace / coloring: ảnh đặt ở trường image (không đặt trong prompt), width/height đúng bằng kích thước ảnh đã upload, mọi toạ độ theo pixel của ảnh đó (gốc góc trên trái). Vector trong PDF (nét đứt, tường mê cung) đọc được toạ độ trực tiếp; nhớ đổi theo tỉ lệ khi render ảnh.
 4. Gắn skillCodes có sẵn; thiếu thì upsert_topic / upsert_skill trước.
 5. Viết explanation ngắn, dễ hiểu cho trẻ.
 6. Gọi create_worksheet (bài tạo ra là nháp). Lỗi sẽ chỉ rõ đường dẫn trường sai, sửa rồi gọi lại.

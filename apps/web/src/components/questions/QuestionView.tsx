@@ -4,6 +4,7 @@ import { MultiChoice, SingleChoice, TrueFalse } from './ChoiceQuestions'
 import { Hotspot, Maze, Trace } from './DrawQuestions'
 import { ArithGen, ColumnArith, FillBlank, Info, NumberInput, SplitStrategy } from './InputQuestions'
 import { ClockSet, Matching, Ordering } from './InteractiveQuestions'
+import { Coloring } from './Coloring'
 
 type Props = {
   body: KidQuestionBody | QuestionBody
@@ -55,6 +56,8 @@ export function QuestionView({ body, solution, response, onChange = noop, lang }
             return <Maze body={body as never} {...props} />
           case 'trace':
             return <Trace body={body} {...props} />
+          case 'coloring':
+            return <Coloring body={body} {...props} />
           case 'arith_gen':
             return <ArithGen body={body} {...props} />
         }

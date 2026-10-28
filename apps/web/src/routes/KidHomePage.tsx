@@ -5,7 +5,7 @@ import { errorMessage, post } from '../api'
 import { useKidHome } from './kid/KidLayout'
 import { Stars } from './kid/ResultView'
 
-const SUBJECT_ICON: Record<string, string> = { math: '🔢', vi: '📖', en: '🔤' }
+const SUBJECT_ICON: Record<string, string> = { math: '🔢', vi: '📖', en: '🔤', art: '🎨' }
 const NO_TOPIC = 'Khác'
 
 const SHOW_FILTER = {

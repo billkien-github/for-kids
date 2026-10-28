@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import {
+  COMPLETION_ONLY_TYPES,
   expandArithGen,
   gradeQuestion,
   localDate,
@@ -282,7 +283,7 @@ async function finalizeAttempt(deps: Deps, attemptId: string, auto: boolean) {
         .where(eq(attemptAnswer.id, ans.id))
       if (score !== null) {
         scored.push({ score, points: snap.points })
-        progress.push({ questionId: ans.questionId, skillIds: snap.skillIds ?? [], score })
+        if (!COMPLETION_ONLY_TYPES.includes(snap.body.type)) progress.push({ questionId: ans.questionId, skillIds: snap.skillIds ?? [], score })
       }
     }
     const { total, earned, pct } = scorePercent(scored)

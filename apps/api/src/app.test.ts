@@ -17,7 +17,7 @@ describe('seed', async () => {
     const { familyId } = await seed(db, { familyName: 'Nhà mình', parent: { ...TEST_PARENT, email: 'Parent@Example.com' } })
 
     const subjects = await db.select().from(schema.subject)
-    expect(subjects.map((s) => s.code).sort()).toEqual(['en', 'math', 'vi'])
+    expect(subjects.map((s) => s.code).sort()).toEqual(['art', 'en', 'math', 'vi'])
 
     const [p] = await db.select().from(schema.parentUser)
     expect(p!.email).toBe('parent@example.com')
@@ -41,7 +41,7 @@ describe('seed', async () => {
     await seed(db, { familyName: 'Nhà mình' })
 
     expect(await db.select({ n: count() }).from(schema.family)).toEqual([{ n: 1 }])
-    expect(await db.select({ n: count() }).from(schema.subject)).toEqual([{ n: 3 }])
+    expect(await db.select({ n: count() }).from(schema.subject)).toEqual([{ n: 4 }])
     expect(await db.select({ n: count() }).from(schema.skill)).toEqual(before)
   })
 })

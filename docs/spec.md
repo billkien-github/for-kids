@@ -10,7 +10,7 @@
 | Phạm vi | Dùng cho 1 gia đình, nhưng DB thiết kế theo `family` để sau mở rộng được. |
 | Thiết bị | Tablet / iPad. Truy cập bằng link trên trình duyệt (không cần PWA, không offline, không push). |
 | Đọc đề (TTS) | Chỉ dùng Web Speech API của trình duyệt (giọng có sẵn trên iPad). Không dùng dịch vụ TTS trên server, không cần API key. |
-| Môn | Toán, Tiếng Việt, Tiếng Anh (vẫn cho thêm môn mới). Đề có thể **song ngữ Anh–Việt**: mỗi bài chọn ngôn ngữ chính (`worksheet.lang`), dòng dịch để ở `sub`. |
+| Môn | Toán, Tiếng Việt, Tiếng Anh, Mỹ thuật (`art`: tô màu; vẫn cho thêm môn mới). Đề có thể **song ngữ Anh–Việt**: mỗi bài chọn ngôn ngữ chính (`worksheet.lang`), dòng dịch để ở `sub`. |
 | Chủ đề / kỹ năng | Không bám theo bộ sách giáo khoa nào. Seed sẵn theo các dạng bài trong mẫu (§3). Agent tạo thêm khi cần. |
 | Bố cục làm bài | Mỗi bài chọn một trong hai chế độ: mỗi màn 1 câu, hoặc **lưới** (nhiều câu trên một màn) cho bài luyện tính nhanh. |
 | Giới hạn thời gian | Có từ P1: đếm ngược và tự nộp khi hết giờ (ví dụ Math Minutes 1 phút, TIMO 60 phút). |
@@ -45,7 +45,7 @@ Kiểu dữ liệu chung: `id` dùng uuid, timestamp dùng `timestamptz`. Múi g
 - `api_token(id, family_id, name, token_hash, scopes text[], last_used_at, revoked_at, created_at)`
 
 ### Nội dung
-- `subject(id, family_id null, code, name, tts_lang)`: seed sẵn `math`, `vi` (`vi-VN`), `en` (`en-US`). `family_id` null nghĩa là môn dùng chung.
+- `subject(id, family_id null, code, name, tts_lang)`: seed sẵn `math`, `vi` (`vi-VN`), `en` (`en-US`), `art` (Mỹ thuật, `vi-VN`; migration 0004 thêm cho bản cài cũ). `family_id` null nghĩa là môn dùng chung.
 - `topic(id, family_id, subject_id, grade_min, grade_max, name, sort_order)`: unique `(family_id, subject_id, name)`.
 - `skill(id, family_id, subject_id, topic_id null, code, name, grade null)`: unique `(family_id, code)`. Ví dụ `math.add.carry`, `vi.spell.tr-ch`.
 - `worksheet(id, family_id, subject_id, topic_id null, grade, title, description, lang null, layout one_per_screen|grid, status draft|published|archived, source manual|mcp, source_note, time_limit_sec null, created_by_token_id null, published_at, updated_at)`:
@@ -136,6 +136,8 @@ type QuestionBody =
       path: [number, number][]; tolerance: number }      // lối đi đúng, theo giữa lối, từ xuất phát tới đích
   | { type: 'trace';   prompt: RichText; image?: string; width: number; height: number;
       paths: [number, number][][]; tolerance: number }   // nét mẫu; không có ảnh thì app tự vẽ nét đứt
+  // Tô màu: tranh nét đen nền trắng. Bé chạm vùng kín để đổ màu, hoặc tô tự do bằng bút; có tẩy, hoàn tác.
+  | { type: 'coloring'; prompt: RichText; image: string; width: number; height: number; palette?: string[] }  // palette: mã #rrggbb
   // Bài tự sinh: lúc bé bắt đầu làm, server sinh `count` phép tính mới thành các câu fill_blank.
   // Cộng: tổng ≤ max; trừ: số trừ ≤ số bị trừ ≤ max. missing: ô trống ở kết quả (mặc định), ở một số hạng, hoặc trộn.
   | { type: 'arith_gen'; ops: ('+' | '-')[]; min?: number; max: number; count: number; missing?: 'result' | 'operand' | 'mixed' }
@@ -169,6 +171,7 @@ Quy tắc chấm (chạy ở server, mỗi câu được điểm từ 0 đến 1
 | `hotspot` | Điểm = max(0, số vùng được chạm trúng − số lần chạm ra ngoài mọi vùng) / số vùng. Chạm nhiều lần vào cùng một vùng không bị trừ. Bé chỉ biết số vùng cần tìm, không thấy vùng. |
 | `maze` | Đúng hết hoặc 0 điểm. Đúng khi: ≥ 90% nét vẽ nằm trong `tolerance` quanh lối đúng, phủ ≥ 85% lối đúng, và có điểm tới gần đích (≤ 2 × `tolerance`). Nhấc tay giữa chừng không sao. Bé thấy điểm đầu/cuối, không thấy lối đi. |
 | `trace` | Độ chính xác (tỉ lệ nét vẽ nằm trong 1,5 × `tolerance` quanh nét mẫu) dưới 70% thì 0 điểm; còn lại điểm theo độ phủ nét mẫu (phủ ≥ 85% là đủ điểm), làm tròn xuống từng 1/4. |
+| `coloring` | Không chấm đẹp/xấu: có ít nhất một lần đổ màu hoặc nét bút là đủ điểm, chưa tô (hoặc chỉ tẩy) là 0. Chỉ tính sao, không vào mức thành thạo kỹ năng và danh sách ôn. Câu trả lời là danh sách bước tô `{ ops: [{t:'fill', p, c} | {t:'brush', c, w, pts} | {t:'erase', w, pts}] }` (tối đa 500 bước), vẽ lại theo thứ tự để phụ huynh xem tranh của bé. |
 | `arith_gen` | Không chấm trực tiếp: đã sinh thành các câu `fill_blank`. |
 
 `is_correct` = (`score` == 1). **Trước khi bé nộp bài, API dành cho bé không bao giờ trả về `answer`, `accept`, `pairs`.** Với `split_strategy` và `column_arith`, đáp án được suy ra từ đề nên không cần giấu.
@@ -388,6 +391,7 @@ Hiện không còn vấn đề mở.
 | Tô các số giống nhau (Bugs, Number Scramble), tìm đồ vật ẩn trong tranh | `hotspot` |
 | Mê cung vẽ đường | `maze`; mê cung có đánh số lối thì `single_choice` |
 | Tô số / chữ / đường cong theo nét, tô bằng hai tay | `trace` |
+| Tranh tô màu | `coloring` (cắt tranh nét, bỏ chữ và khung trang trí) |
 | Phiếu cộng trừ ngẫu nhiên "trong phạm vi N" (Excel tự tạo) | `arith_gen` |
 | Flashcard, poster đơn vị thời gian, mô hình đồng hồ | `info` (không chấm). Có thể kèm câu `number_input` "Có bao nhiêu…?" để chấm phần đếm. |
 | Tô ô biểu đồ (pictograph, bar graph) | Chưa có loại riêng. Tạm chuyển thành câu hỏi đọc biểu đồ (`number_input` + hình). |

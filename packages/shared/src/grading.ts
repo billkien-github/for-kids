@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { gradeHotspot, gradeMaze, gradeTrace } from './drawing.js'
-import { Point, type Blank, type QuestionBody, type QuestionType } from './question.js'
+import { HexColor, Point, type Blank, type QuestionBody, type QuestionType } from './question.js'
 import { deriveSplit } from './split-strategy.js'
 
 // ---------- Câu trả lời của bé (lưu ở attempt_answer.response) ----------
@@ -9,6 +9,23 @@ import { deriveSplit } from './split-strategy.js'
 export const MAX_STROKES = 100
 export const MAX_STROKE_POINTS = 5000
 const Strokes = z.array(z.array(Point)).transform((s) => s.slice(0, MAX_STROKES).map((l) => l.slice(0, MAX_STROKE_POINTS)))
+
+/** Trần số bước tô của một tranh tô màu (đổ màu + nét bút + nét tẩy). */
+export const MAX_COLORING_OPS = 500
+/** Trần tổng số điểm của mọi nét bút/tẩy trong một tranh (≈ 1MB JSON), để mỗi lần lưu không quá nặng. */
+export const MAX_COLORING_POINTS = 100_000
+const brushWidth = z.number().positive().max(500)
+/** Các bước tô theo thứ tự; vẽ lại lần lượt từ tranh trắng ra đúng bức tranh của bé. */
+export const ColoringOp = z.discriminatedUnion('t', [
+  z.object({ t: z.literal('fill'), p: Point, c: HexColor }),
+  z.object({ t: z.literal('brush'), c: HexColor, w: brushWidth, pts: z.array(Point).min(1).max(MAX_STROKE_POINTS) }),
+  z.object({ t: z.literal('erase'), w: brushWidth, pts: z.array(Point).min(1).max(MAX_STROKE_POINTS) }),
+])
+export type ColoringOp = z.infer<typeof ColoringOp>
+
+export const coloringPoints = (ops: ColoringOp[]) => ops.reduce((n, o) => n + (o.t === 'fill' ? 1 : o.pts.length), 0)
+/** Đã tô: có ít nhất một lần đổ màu hoặc nét bút (chỉ tẩy thì chưa). */
+const coloringDone = (ops: ColoringOp[]) => ops.some((o) => o.t !== 'erase')
 
 export const ResponseSchemas = {
   single_choice: z.object({ choice: z.string() }),
@@ -28,6 +45,12 @@ export const ResponseSchemas = {
   hotspot: z.object({ taps: z.array(Point).max(100) }),
   maze: z.object({ strokes: Strokes }),
   trace: z.object({ strokes: Strokes }),
+  coloring: z.object({
+    ops: z
+      .array(ColoringOp)
+      .max(MAX_COLORING_OPS)
+      .refine((ops) => coloringPoints(ops) <= MAX_COLORING_POINTS, { message: `Tối đa ${MAX_COLORING_POINTS} điểm nét` }),
+  }),
   // Không bao giờ tới tay bé: server đã sinh thành các câu fill_blank lúc bắt đầu làm.
   arith_gen: z.object({}),
 } satisfies Record<QuestionType, z.ZodType>
@@ -148,8 +171,14 @@ export function gradeQuestion(q: QuestionBody, rawResponse: unknown): number | n
       return gradeMaze(q, (r as QuestionResponse<'maze'>).strokes)
     case 'trace':
       return gradeTrace(q, (r as QuestionResponse<'trace'>).strokes)
+    // Tô màu không chấm đẹp/xấu: đã tô (đổ màu hoặc vẽ bút) là được trọn điểm.
+    case 'coloring':
+      return coloringDone((r as QuestionResponse<'coloring'>).ops) ? 1 : 0
   }
 }
+
+/** Câu chỉ tính sao khi làm xong, không vào mức thành thạo kỹ năng và hộp ôn câu sai. */
+export const COMPLETION_ONLY_TYPES: readonly QuestionType[] = ['coloring']
 
 /** §5.1: score_pct = Σ(score × points) / Σ points × 100. Câu info (points 0) không ảnh hưởng. */
 export function scorePercent(items: { score: number; points: number }[]): { total: number; earned: number; pct: number } {
@@ -185,6 +214,8 @@ export function isAnswered(q: QuestionBody, rawResponse: unknown): boolean {
     case 'maze':
     case 'trace':
       return (r.strokes as unknown[]).length > 0
+    case 'coloring':
+      return coloringDone(r.ops as ColoringOp[])
     default:
       return true
   }

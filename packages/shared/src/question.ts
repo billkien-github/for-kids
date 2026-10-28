@@ -231,6 +231,25 @@ const Trace = z
   })
   .superRefine((q, ctx) => q.paths.forEach((p, i) => pointsInside(p, q, ['paths', i], ctx)))
 
+export const HexColor = z.string().regex(/^#[0-9a-f]{6}$/i, 'dạng #rrggbb')
+
+/** Bảng màu mặc định của câu tô màu. */
+export const COLORING_PALETTE = [
+  '#ef4444', '#f97316', '#facc15', '#84cc16', '#22c55e', '#14b8a6',
+  '#38bdf8', '#3b82f6', '#8b5cf6', '#ec4899', '#a16207', '#f5d0a9',
+  '#64748b', '#111827',
+] as const
+
+const Coloring = z.object({
+  type: z.literal('coloring'),
+  prompt: RichText,
+  /** Tranh nét đen trên nền trắng (hoặc trong suốt). Chạm vào vùng kín giữa các nét để đổ màu. */
+  image: z.uuid(),
+  ...canvas,
+  /** Màu cho bé chọn; bỏ trống thì dùng COLORING_PALETTE. */
+  palette: z.array(HexColor).min(2).max(24).optional(),
+})
+
 // ---------- Bài tự sinh: mỗi lần bé làm, server sinh `count` phép tính mới thành các câu fill_blank ----------
 
 const ArithGen = z
@@ -269,6 +288,7 @@ export const QuestionBody = z.discriminatedUnion('type', [
   Hotspot,
   Maze,
   Trace,
+  Coloring,
   ArithGen,
 ])
 

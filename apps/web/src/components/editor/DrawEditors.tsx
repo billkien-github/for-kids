@@ -212,6 +212,21 @@ export function TraceEditor({ body, onChange }: EditorProps<'trace'>) {
   )
 }
 
+export function ColoringEditor({ body, onChange }: EditorProps<'coloring'>) {
+  return (
+    <div className="flex flex-col gap-3">
+      <RichTextEditor value={body.prompt} onChange={(prompt) => onChange({ ...body, prompt })} placeholder="Đề, vd. Tô màu chú mèo" />
+      <ImagePicker has={!!body.image} onPick={(v) => onChange({ ...body, ...v })} />
+      <p className="text-sm text-slate-500">
+        Dùng tranh nét đen trên nền trắng. Bé chạm vào vùng kín giữa các nét để đổ màu, hoặc tô tự do bằng bút. Không chấm đúng sai: tô là được điểm.
+      </p>
+      {body.image && (
+        <ImageCanvas width={body.width} height={body.height} image={body.image} className="max-w-md ring-1 ring-slate-200" />
+      )}
+    </div>
+  )
+}
+
 export function ArithGenEditor({ body, onChange }: EditorProps<'arith_gen'>) {
   const toggle = (op: '+' | '-') => {
     const ops = body.ops.includes(op) ? body.ops.filter((o) => o !== op) : [...body.ops, op]

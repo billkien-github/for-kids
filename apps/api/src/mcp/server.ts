@@ -25,7 +25,7 @@ import { generatePracticePrompt, IMPORT_WORKSHEET_PROMPT, QUESTION_EXAMPLES } fr
 // Tham số của create/update_worksheet. Kiểu câu hỏi để lỏng ở đây; WorksheetInput kiểm tra chi tiết
 // để báo lỗi kèm đường dẫn chính xác.
 const worksheetShape = {
-  subjectCode: z.string().describe('math | vi | en'),
+  subjectCode: z.string().describe('math | vi | en | art'),
   grade: z.number().int().describe('0 = mầm non, 1–12'),
   title: z.string(),
   topic: z.string().optional().describe('Tên chủ đề; chưa có thì tự tạo'),

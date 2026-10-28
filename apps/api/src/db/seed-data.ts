@@ -4,6 +4,7 @@ export const SUBJECTS = [
   { code: 'math', name: 'Toán', ttsLang: 'vi-VN' },
   { code: 'vi', name: 'Tiếng Việt', ttsLang: 'vi-VN' },
   { code: 'en', name: 'Tiếng Anh', ttsLang: 'en-US' },
+  { code: 'art', name: 'Mỹ thuật', ttsLang: 'vi-VN' },
 ] as const
 
 type TopicSeed = {

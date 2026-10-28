@@ -1,5 +1,5 @@
-import { localDate, skillLevel, weekStart, type ChildReport, type Mistake, type SkillProgress } from '@for-kids/shared'
-import { and, asc, desc, eq, gte, inArray, isNotNull, lt, lte } from 'drizzle-orm'
+import { COMPLETION_ONLY_TYPES, localDate, skillLevel, weekStart, type ChildReport, type Mistake, type SkillProgress } from '@for-kids/shared'
+import { and, asc, desc, eq, gte, inArray, isNotNull, lt, lte, notInArray, sql } from 'drizzle-orm'
 import { findActiveChild } from '../db/children.js'
 import { attempt, attemptAnswer, skill, skillMastery, subject, topic, worksheet } from '../db/schema.js'
 import type { Deps } from '../deps.js'
@@ -124,7 +124,15 @@ export async function childMistakes(deps: Deps, familyId: string, childId: strin
     .from(attemptAnswer)
     .innerJoin(attempt, eq(attempt.id, attemptAnswer.attemptId))
     .leftJoin(worksheet, eq(worksheet.id, attempt.worksheetId))
-    .where(and(eq(attempt.childId, childId), isNotNull(attempt.submittedAt), lt(attemptAnswer.score, 1)))
+    .where(
+      and(
+        eq(attempt.childId, childId),
+        isNotNull(attempt.submittedAt),
+        lt(attemptAnswer.score, 1),
+        // Câu chỉ tính hoàn thành (tô màu) chưa làm không phải là lỗi sai.
+        notInArray(sql<string>`${attemptAnswer.questionSnapshot}->'body'->>'type'`, [...COMPLETION_ONLY_TYPES]),
+      ),
+    )
     .orderBy(desc(attempt.submittedAt))
     .limit(limit)
 

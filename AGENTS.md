@@ -28,6 +28,7 @@ Cách tách câu, chọn loại câu hỏi, upload ảnh: theo hướng dẫn c�
    - `single_choice`, `multi_choice`, `true_false`: cùng đề và cùng các phương án
    - `hotspot`, `maze`: cùng `image` (ảnh khử trùng theo nội dung nên cùng ảnh nguồn thì cùng assetId)
    - `trace`: cùng `image` và cùng nét mẫu
+   - `coloring`: cùng `image`
    - `arith_gen`: cùng `ops`, `min`, `max`, `missing`
 
 Xử lý:
