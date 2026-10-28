@@ -19,3 +19,5 @@
 | `TRÒ CHƠI TƯ DUY MẦM NON/00_Tro Choi Me Cung_File 1…pdf` (80 trang ảnh) | Mê cung "con nào tới đích" có đánh số lối → `single_choice`; phải giải bằng mắt từng trang. |
 | `TRÒ CHƠI TƯ DUY MẦM NON/03. Hình khối con gà…`, `Chia sẻ Học liệu khám phá 4-6t…` | Chưa xem kỹ; có thể dùng `trace`. |
 | `mazes.pdf` trang 6–10, 15–20, 25–30, 34–40 | Mê cung khó hơn; công cụ giải tự động đã có, nhập thêm khi các bé lớn hơn. |
+| `TOÁN TẬP ĐẾM MẦM NON/nối số tổng hợp…pdf`, `tổng hợp…/NOI SO.docx` (≈70 tranh nối điểm) | `trace`: nét mẫu là đường nối các chấm theo thứ tự số; cần lấy toạ độ và số của từng chấm. |
+| `TOÁN TẬP ĐẾM MẦM NON/TẬP ĐẾM 1-10 VÀ TÌM HÌNH…pdf` trang 8, 9, 11, 14, 15, 17, 21–23 | `hotspot` tìm hình không có cặp; công cụ tự tìm chưa chắc ở các trang này, cần soát tay. |
